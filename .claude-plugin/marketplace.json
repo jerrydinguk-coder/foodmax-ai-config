@@ -1,0 +1,18 @@
+{
+  "name": "foodmax-ai-config",
+  "owner": { "name": "FoodMax Engineering" },
+  "plugins": [
+    {
+      "name": "foodmax-ai-config",
+      "source": ".",
+      "description": "FoodMax team-wide AI rules, skills, and hooks",
+      "version": "0.1.0",
+      "hooks": [
+        {
+          "event": "SessionStart",
+          "command": "bash ${PLUGIN_DIR}/hooks/session-start-banner.sh"
+        }
+      ]
+    }
+  ]
+}
