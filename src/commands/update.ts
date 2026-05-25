@@ -12,13 +12,14 @@ import {
 } from '../lib/paths.js';
 import { installPlugin, defaultExec, type Exec } from '../lib/plugin-install.js';
 import { ok, fail, info } from '../lib/log.js';
+import {
+  FOODMAX_PACKAGE as PACKAGE_NAME,
+  FOODMAX_SOURCE as SOURCE,
+  FOODMAX_MARKETPLACE as MARKETPLACE_NAME,
+  FOODMAX_PLUGIN as PLUGIN_NAME,
+} from '../lib/constants.js';
 
 const _exec = promisify(execFile);
-
-const PACKAGE_NAME = 'foodmax-ai-config';
-const SOURCE = 'github:foodmax/ai-config-init';
-const MARKETPLACE_NAME = 'foodmax-ai-config';
-const PLUGIN_NAME = 'foodmax-ai-config';
 
 export interface RunUpdateOptions {
   cwd: string;

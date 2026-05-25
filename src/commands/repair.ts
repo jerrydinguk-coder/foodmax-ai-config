@@ -9,11 +9,12 @@ import {
 } from '../lib/lockfile.js';
 import { packageLockfileName } from '../lib/paths.js';
 import { ok, warn, fail, info } from '../lib/log.js';
+import {
+  FOODMAX_PACKAGE as PACKAGE_NAME,
+  FOODMAX_SOURCE as SOURCE,
+} from '../lib/constants.js';
 
 const _exec = promisify(execFile);
-
-const PACKAGE_NAME = 'foodmax-ai-config';
-const SOURCE = 'github:foodmax/ai-config-init';
 
 export interface RunRepairOptions {
   cwd: string;

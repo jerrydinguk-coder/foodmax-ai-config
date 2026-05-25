@@ -7,17 +7,19 @@ import { readLockfile } from '../lib/lockfile.js';
 import { packageLockfileName, projectLockfileName } from '../lib/paths.js';
 import { detectClaudeCli, type DetectResult } from '../lib/claude-detect.js';
 import { installPlugin, defaultExec, type Exec } from '../lib/plugin-install.js';
+import { runAllIntegrations } from '../lib/integrations.js';
 import { mergeClaudeMd, mergeGitignore } from '../lib/merge.js';
 import { PROJECT_CLAUDE_MD_BLOCK } from '../templates/project-claude-md.js';
 import { CI_WORKFLOW_YAML } from '../templates/ci-workflow.js';
 import { ok, warn, fail, info, bold } from '../lib/log.js';
+import {
+  FOODMAX_PACKAGE as PACKAGE_NAME,
+  FOODMAX_SOURCE as SOURCE,
+  FOODMAX_MARKETPLACE as MARKETPLACE_NAME,
+  FOODMAX_PLUGIN as PLUGIN_NAME,
+} from '../lib/constants.js';
 
 const _exec = promisify(execFile);
-
-const SOURCE = 'github:foodmax/ai-config-init';
-const MARKETPLACE_NAME = 'foodmax-ai-config';
-const PLUGIN_NAME = 'foodmax-ai-config';
-const PACKAGE_NAME = 'foodmax-ai-config';
 
 export interface RunInitOptions {
   cwd: string;
@@ -82,7 +84,7 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
   writeProjectGitignore(opts.cwd);
   writeProjectCiWorkflow(opts.cwd);
 
-  // Step 2: plugin install
+  // Step 2: plugin install (the critical one)
   const installR = await installPlugin({
     source: SOURCE,
     marketplaceName: MARKETPLACE_NAME,
@@ -95,6 +97,20 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
     console.log(warn(`You may need to run manually: claude plugin marketplace add ${SOURCE}`));
   } else {
     console.log(ok('Claude plugin installed (scope=user)'));
+  }
+
+  // Step 2b: best-effort integrations (superpowers plugin + MCPs + lark-cli).
+  // Failures here log a warning but never fail init — the foodmax plugin
+  // above is the only critical install.
+  const integrationResults = await runAllIntegrations({ exec });
+  for (const r of integrationResults) {
+    if (r.status === 'installed') {
+      console.log(ok(`${r.name} installed`));
+    } else if (r.status === 'skipped') {
+      console.log(info(`${r.name} skipped${r.reason ? ` (${r.reason})` : ''}`));
+    } else {
+      console.log(warn(`${r.name} install failed${r.reason ? `: ${r.reason}` : ''}`));
+    }
   }
 
   // Step 3: project lockfile
@@ -120,10 +136,14 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
   console.log(ok(bold('Done. Team AI config installed.')));
   console.log('');
   console.log(info(bold('Next:')));
-  console.log(info('  1. Restart Claude Code so the plugin loads'));
-  console.log(info('  2. Try the team skills: /foodmax-pr-description, /foodmax-new-module'));
-  console.log(info('  3. CI: commit .github/workflows/ai-config-verify.yml so PRs verify on push'));
-  console.log(info('  4. Stay current: `npx foodmax-ai update`'));
+  console.log(info('  1. Restart Claude Code so plugins + MCPs load'));
+  console.log(info('  2. Export Feishu credentials in your shell rc BEFORE restarting Claude:'));
+  console.log(info('       export LARK_APP_ID=cli_xxxxx'));
+  console.log(info('       export LARK_APP_SECRET=xxxxx'));
+  console.log(info('     (without these, the feishu MCP will start but every call will fail)'));
+  console.log(info('  3. `lark-cli login` if you plan to use the CLI directly'));
+  console.log(info('  4. CI: commit .github/workflows/ai-config-verify.yml so PRs verify on push'));
+  console.log(info('  5. Stay current: `npx foodmax-ai update`'));
 }
 
 function writeProjectClaudeMd(cwd: string): void {
