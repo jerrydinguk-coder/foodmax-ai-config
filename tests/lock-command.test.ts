@@ -25,3 +25,24 @@ test('runLock writes .locked.json with rootHash', async () => {
   expect(lock.tool).toContain('1.2.3');
   expect(lock.rootHash).toMatch(/^[0-9a-f]{64}$/);
 });
+
+test('runLock leaves file unchanged when rootHash matches (preserves generatedAt)', async () => {
+  await runLock({ cwd: dir });
+  const path = join(dir, '.locked.json');
+  const first = readFileSync(path, 'utf8');
+  // Wait a tick so any new timestamp would differ
+  await new Promise((r) => setTimeout(r, 10));
+  await runLock({ cwd: dir });
+  const second = readFileSync(path, 'utf8');
+  expect(second).toBe(first);
+});
+
+test('runLock rewrites when content changes', async () => {
+  await runLock({ cwd: dir });
+  const path = join(dir, '.locked.json');
+  const firstHash = JSON.parse(readFileSync(path, 'utf8')).rootHash;
+  writeFileSync(join(dir, 'CLAUDE.md'), '# rules changed\n');
+  await runLock({ cwd: dir });
+  const secondHash = JSON.parse(readFileSync(path, 'utf8')).rootHash;
+  expect(secondHash).not.toBe(firstHash);
+});
