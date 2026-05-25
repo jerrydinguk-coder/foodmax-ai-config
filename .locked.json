@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "tool": "foodmax-ai-config@0.1.0",
+  "generatedAt": "2026-05-25T10:42:00.973Z",
+  "algorithm": "sha256",
+  "tree": {
+    ".claude-plugin/marketplace.json": "fd430dd0b42a3211a25397da42ee399d6b6c2d18e25f18ce410b291234e5cc25",
+    "CLAUDE.md": "5bb16ce54b043691b0755b917e1c9e9c27e0172bb8260acc0ee68e9440523306",
+    "hooks/session-start-banner.sh": "fb26f4094badaa9db849c46eb44f61da72fb35576039007f883760b4d588b1e3",
+    "skills/foodmax-new-module/SKILL.md": "f62620f67402431ebc4589a5a791b6e9a597af6a4fa48a8ad70888cb5d72a0c6",
+    "skills/foodmax-pr-description/SKILL.md": "1ee9a02090e13c60de971b6997ec865eefd898139bd10c2460b7bdb5d5879abb"
+  },
+  "rootHash": "d7525dcd70e675944c5eef50e276236734817d5cb496bc8f026dcd595069cbe7"
+}
