@@ -1,0 +1,43 @@
+{
+  "name": "foodmax-ai-config",
+  "version": "0.1.0",
+  "description": "FoodMax team-wide AI assistant configuration (Claude Code plugin + npm CLI)",
+  "type": "module",
+  "bin": {
+    "foodmax-ai": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "hooks",
+    "commands",
+    "agents",
+    "CLAUDE.md",
+    ".claude-plugin",
+    ".locked.json"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lock": "tsx src/cli.ts lock",
+    "prepare": "tsup"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "diff": "^5.2.0"
+  },
+  "devDependencies": {
+    "@types/diff": "^5.2.0",
+    "@types/node": "^20.14.0",
+    "tsup": "^8.2.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}
