@@ -1,6 +1,8 @@
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { generateLockfile } from '../../src/lib/lockfile.js';
+import { packageLockfileName } from '../../src/lib/paths.js';
 
 export interface TempProject {
   dir: string;
@@ -43,5 +45,8 @@ export function makeFakeInstalledPackage(parentDir: string): string {
   mkdirSync(join(pkgRoot, 'hooks'), { recursive: true });
   writeFileSync(join(pkgRoot, 'hooks', 'h.sh'), '#!/bin/sh\necho hi\n');
   writeFileSync(join(pkgRoot, 'package.json'), JSON.stringify({ name: 'foodmax-ai-config', version: '0.1.0' }));
+  // Generate the package's internal lockfile (init checks for it)
+  const lock = generateLockfile(pkgRoot, 'foodmax-ai-config@0.1.0');
+  writeFileSync(join(pkgRoot, packageLockfileName()), JSON.stringify(lock, null, 2) + '\n');
   return pkgRoot;
 }
