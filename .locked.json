@@ -1,7 +1,7 @@
 {
   "version": 1,
   "tool": "foodmax-ai-config@0.1.0",
-  "generatedAt": "2026-05-25T11:30:30.582Z",
+  "generatedAt": "2026-05-25T11:35:40.633Z",
   "algorithm": "sha256",
   "tree": {
     ".claude-plugin/marketplace.json": "fd430dd0b42a3211a25397da42ee399d6b6c2d18e25f18ce410b291234e5cc25",
@@ -153,8 +153,6 @@
     "skills/skill-creator/eval-viewer/viewer.html": "a53213426ee1100441d701a3a0d49cda7a842f992d2c36463f4d3cc0258575fa",
     "skills/skill-creator/references/schemas.md": "8e8876180a8989b406a4d3edddf875b04cdfd5805cc8616686d552b11ce4455f",
     "skills/skill-creator/scripts/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "skills/skill-creator/scripts/__pycache__/__init__.cpython-313.pyc": "8bb9c6a9308680464a66ff32190570a59c4d8e7651ff0d1524a577856b0ef61a",
-    "skills/skill-creator/scripts/__pycache__/aggregate_benchmark.cpython-313.pyc": "23ba12a22ac36d3918a0e378aef765e961c664dfd061c0d5370d321be90f8545",
     "skills/skill-creator/scripts/aggregate_benchmark.py": "123ef128ea5ccc01a4b1ac212ef5567f21e9c13d3d240609780beeb3200c49aa",
     "skills/skill-creator/scripts/generate_report.py": "13df7118a3c50c83c4c3250a606d5f2b20b25a3d44cbc392b3d669ec75281453",
     "skills/skill-creator/scripts/improve_description.py": "87d864570220b699fac52da309d2d6efdb060647bfebc74f768128e646accf80",
@@ -237,5 +235,5 @@
     "skills/xlsx/scripts/office/validators/redlining.py": "f4c33fdb9da0651d1d9aa76f0d5294cc9955869339ae131b2f75f3b2e366cb40",
     "skills/xlsx/scripts/recalc.py": "cf419d15e02965aeaec17773c05b61303f7f520f67fa2696547e7da07502eac7"
   },
-  "rootHash": "4ecb2ac02e42ae06bd52ae313c6e86119620f076eb7bed262414d465d84b3a34"
+  "rootHash": "4cc8096fdaaf0c0387588b6e3a4f1118695839caf49391dd625f72bba697b25d"
 }

@@ -25,13 +25,24 @@ const fakeExec = async (cmd: string, args: string[]) => {
 
 const fakeClaudeDetect = async () => ({ ok: true as const, version: '1.0.0' });
 
+// Stub integration env probes so tests never shell out (e.g., `which lark-cli`,
+// `claude mcp list`) or trigger real `npm install -g` on CI.
+const fakeLarkCliPresent = async () => true;
+const fakeListMcpNames = async () => [] as string[];
+
+const baseRunInit = {
+  exec: fakeExec,
+  claudeDetect: fakeClaudeDetect,
+  larkCliPresent: fakeLarkCliPresent,
+  listMcpNames: fakeListMcpNames,
+  yes: true as const,
+};
+
 test('init writes CLAUDE.md with team region', async () => {
   await runInit({
     cwd: project.dir,
     packageRootOverride: pkgRoot,
-    exec: fakeExec,
-    claudeDetect: fakeClaudeDetect,
-    yes: true,
+    ...baseRunInit,
   });
   const md = readFileSync(join(project.dir, 'CLAUDE.md'), 'utf8');
   expect(md).toContain('<!-- BEGIN foodmax-ai -->');
@@ -42,9 +53,7 @@ test('init adds foodmax-ai-config to package.json devDependencies', async () => 
   await runInit({
     cwd: project.dir,
     packageRootOverride: pkgRoot,
-    exec: fakeExec,
-    claudeDetect: fakeClaudeDetect,
-    yes: true,
+    ...baseRunInit,
   });
   const pkg = JSON.parse(readFileSync(join(project.dir, 'package.json'), 'utf8'));
   expect(pkg.devDependencies['foodmax-ai-config']).toContain('github:foodmax/ai-config-init');
@@ -54,9 +63,7 @@ test('init writes .gitignore with settings.local.json', async () => {
   await runInit({
     cwd: project.dir,
     packageRootOverride: pkgRoot,
-    exec: fakeExec,
-    claudeDetect: fakeClaudeDetect,
-    yes: true,
+    ...baseRunInit,
   });
   const gi = readFileSync(join(project.dir, '.gitignore'), 'utf8');
   expect(gi).toContain('.claude/settings.local.json');
@@ -66,9 +73,7 @@ test('init writes .github/workflows/ai-config-verify.yml', async () => {
   await runInit({
     cwd: project.dir,
     packageRootOverride: pkgRoot,
-    exec: fakeExec,
-    claudeDetect: fakeClaudeDetect,
-    yes: true,
+    ...baseRunInit,
   });
   expect(existsSync(join(project.dir, '.github', 'workflows', 'ai-config-verify.yml'))).toBe(true);
 });
@@ -77,9 +82,7 @@ test('init writes .foodmax-ai.lock.json', async () => {
   await runInit({
     cwd: project.dir,
     packageRootOverride: pkgRoot,
-    exec: fakeExec,
-    claudeDetect: fakeClaudeDetect,
-    yes: true,
+    ...baseRunInit,
   });
   const lock = JSON.parse(readFileSync(join(project.dir, '.foodmax-ai.lock.json'), 'utf8'));
   expect(lock.package).toBe('foodmax-ai-config');
@@ -90,9 +93,7 @@ test('init invokes plugin install', async () => {
   await runInit({
     cwd: project.dir,
     packageRootOverride: pkgRoot,
-    exec: fakeExec,
-    claudeDetect: fakeClaudeDetect,
-    yes: true,
+    ...baseRunInit,
   });
   expect(execCalls.length).toBeGreaterThanOrEqual(2);
   expect(execCalls[0]).toEqual([
@@ -105,9 +106,7 @@ test('init invokes superpowers install + MCP registrations after foodmax plugin'
   await runInit({
     cwd: project.dir,
     packageRootOverride: pkgRoot,
-    exec: fakeExec,
-    claudeDetect: fakeClaudeDetect,
-    yes: true,
+    ...baseRunInit,
   });
   // The foodmax plugin install is first; integrations chain after.
   // Use loose matchers because order within integrations + MCP-list pre-check exec
@@ -148,8 +147,8 @@ test('init invokes superpowers install + MCP registrations after foodmax plugin'
 });
 
 test('init is idempotent: second run does not duplicate region', async () => {
-  await runInit({ cwd: project.dir, packageRootOverride: pkgRoot, exec: fakeExec, claudeDetect: fakeClaudeDetect, yes: true });
-  await runInit({ cwd: project.dir, packageRootOverride: pkgRoot, exec: fakeExec, claudeDetect: fakeClaudeDetect, yes: true });
+  await runInit({ cwd: project.dir, packageRootOverride: pkgRoot, ...baseRunInit });
+  await runInit({ cwd: project.dir, packageRootOverride: pkgRoot, ...baseRunInit });
   const md = readFileSync(join(project.dir, 'CLAUDE.md'), 'utf8');
   expect(md.match(/<!-- BEGIN foodmax-ai -->/g)!.length).toBe(1);
 });

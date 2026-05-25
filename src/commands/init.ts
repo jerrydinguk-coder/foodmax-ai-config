@@ -29,6 +29,10 @@ export interface RunInitOptions {
   claudeDetect?: () => Promise<DetectResult>;
   yes?: boolean;
   dryRun?: boolean;
+  /** Inject for tests so init does not shell out to `which lark-cli` / `npm install -g`. */
+  larkCliPresent?: () => Promise<boolean>;
+  /** Inject for tests so init does not run real `claude mcp list`. */
+  listMcpNames?: () => Promise<string[]>;
 }
 
 export async function runInit(opts: RunInitOptions): Promise<void> {
@@ -102,7 +106,11 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
   // Step 2b: best-effort integrations (superpowers plugin + MCPs + lark-cli).
   // Failures here log a warning but never fail init — the foodmax plugin
   // above is the only critical install.
-  const integrationResults = await runAllIntegrations({ exec });
+  const integrationResults = await runAllIntegrations({
+    exec,
+    larkCliPresent: opts.larkCliPresent,
+    listMcpNames: opts.listMcpNames,
+  });
   for (const r of integrationResults) {
     if (r.status === 'installed') {
       console.log(ok(`${r.name} installed`));
