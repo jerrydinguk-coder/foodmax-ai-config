@@ -101,6 +101,52 @@ test('init invokes plugin install', async () => {
   ]);
 });
 
+test('init invokes superpowers install + MCP registrations after foodmax plugin', async () => {
+  await runInit({
+    cwd: project.dir,
+    packageRootOverride: pkgRoot,
+    exec: fakeExec,
+    claudeDetect: fakeClaudeDetect,
+    yes: true,
+  });
+  // The foodmax plugin install is first; integrations chain after.
+  // Use loose matchers because order within integrations + MCP-list pre-check exec
+  // calls may vary as we change defaults.
+  const hasSuperpowersAdd = execCalls.some(
+    ([cmd, args]) =>
+      cmd === 'claude' &&
+      args[0] === 'plugin' &&
+      args[1] === 'marketplace' &&
+      args[2] === 'add' &&
+      args[3] === 'github:obra/superpowers'
+  );
+  const hasSuperpowersInstall = execCalls.some(
+    ([cmd, args]) =>
+      cmd === 'claude' &&
+      args[0] === 'plugin' &&
+      args[1] === 'install' &&
+      args[2] === 'superpowers@superpowers-dev'
+  );
+  const hasPlaywrightMcp = execCalls.some(
+    ([cmd, args]) =>
+      cmd === 'claude' &&
+      args[0] === 'mcp' &&
+      args[1] === 'add' &&
+      args[2] === 'playwright'
+  );
+  const hasFeishuMcp = execCalls.some(
+    ([cmd, args]) =>
+      cmd === 'claude' &&
+      args[0] === 'mcp' &&
+      args[1] === 'add' &&
+      args[2] === 'feishu'
+  );
+  expect(hasSuperpowersAdd).toBe(true);
+  expect(hasSuperpowersInstall).toBe(true);
+  expect(hasPlaywrightMcp).toBe(true);
+  expect(hasFeishuMcp).toBe(true);
+});
+
 test('init is idempotent: second run does not duplicate region', async () => {
   await runInit({ cwd: project.dir, packageRootOverride: pkgRoot, exec: fakeExec, claudeDetect: fakeClaudeDetect, yes: true });
   await runInit({ cwd: project.dir, packageRootOverride: pkgRoot, exec: fakeExec, claudeDetect: fakeClaudeDetect, yes: true });
