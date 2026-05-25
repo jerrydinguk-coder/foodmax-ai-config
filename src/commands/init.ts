@@ -59,7 +59,7 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
   const pkgRoot = opts.packageRootOverride ?? join(opts.cwd, 'node_modules', PACKAGE_NAME);
   if (!existsSync(join(pkgRoot, 'package.json'))) {
     throw new Error(
-      `Installed package not found at ${pkgRoot}. If this is your first init, install first: \`npm install --no-save github:foodmax/ai-config-init\``
+      `Installed package not found at ${pkgRoot}. If this is your first init, install first: \`npm install --no-save ${SOURCE}\``
     );
   }
 
@@ -116,6 +116,7 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
       console.log(ok(`${r.name} installed`));
     } else if (r.status === 'skipped') {
       console.log(info(`${r.name} skipped${r.reason ? ` (${r.reason})` : ''}`));
+      if (r.hint) console.log(warn(r.hint));
     } else {
       console.log(warn(`${r.name} install failed${r.reason ? `: ${r.reason}` : ''}`));
     }
@@ -174,7 +175,7 @@ function writeProjectPackageJson(cwd: string): void {
     console.log(info(`package.json devDependencies["${PACKAGE_NAME}"] already set; leaving it`));
     return;
   }
-  pkg.devDependencies[PACKAGE_NAME] = `github:foodmax/ai-config-init`;
+  pkg.devDependencies[PACKAGE_NAME] = SOURCE;
   writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
   console.log(ok(`Updated package.json devDependencies["${PACKAGE_NAME}"]`));
 }

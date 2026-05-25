@@ -16,7 +16,7 @@
 在你的 FoodMax 项目根目录（例如 `~/CodeBuddy/foodmax-backend/`）下跑：
 
 ```bash
-npx -y github:foodmax/ai-config-init init
+npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/bgs2026/kos/poc/foodmax-ai-config-init.git init
 ```
 
 它会：
@@ -28,7 +28,7 @@ npx -y github:foodmax/ai-config-init init
 6. 写一个 `.foodmax-ai.lock.json` 记录当前版本
 7. 自动装 4 个团队默认集成（见下方"`init` installs what?"）
 
-**前置条件：** 已安装 [Claude Code](https://claude.com/claude-code)、Node 18+、本机 git 有访问 `foodmax/ai-config-init` 私有 repo 的权限（SSH key 或 `gh auth login`）。
+**前置条件：** 已安装 [Claude Code](https://claude.com/claude-code)、Node 18+、本机 git 有访问 Codeup `bgs2026/kos/poc/foodmax-ai-config-init` 私有 repo 的权限（公司 SSO 或 git credential helper）。
 
 ### `init` installs what?
 
@@ -71,6 +71,18 @@ echo 'export LARK_APP_SECRET=xxxxx' >> ~/.zshrc
 npx foodmax-ai update
 ```
 
+这会：拉最新包 → 刷 Claude plugin → **重跑所有集成**（superpowers / playwright MCP / feishu MCP / lark-cli，新增的集成自动装上）→ 重写项目锁。
+
+#### MCP 参数变了？加 `--force-mcp`
+
+如果维护者改了某个 MCP 的注册参数（例如 `@playwright/mcp` 从 `latest` 改成 `1.0.5`），普通 `update` 看到 MCP 已注册会 skip。这时需要：
+
+```bash
+npx foodmax-ai update --force-mcp
+```
+
+它会先 `claude mcp remove` 包内管理的 MCP（playwright + feishu），再重新注册。维护者发这种变更时会在 announce 里点名要求加这个 flag。
+
 ### 在 CI 里守门
 
 `init` 已经写好了 `.github/workflows/ai-config-verify.yml`。commit 进项目后，每个 PR 都会跑 `npx foodmax-ai verify --strict` —— 谁改了 node_modules/foodmax-ai-config/ 里的文件，PR 就过不去。
@@ -79,7 +91,7 @@ npx foodmax-ai update
 
 直接改 `node_modules/foodmax-ai-config/skills/.../SKILL.md` 就行。本地 `verify` 是软警告不挡路。
 
-- 实验成功想保留 → 提 PR 到 foodmax/ai-config-init
+- 实验成功想保留 → 提 PR 到 Codeup `bgs2026/kos/poc/foodmax-ai-config-init`
 - 想放弃 → `npx foodmax-ai repair`
 
 ---
@@ -121,8 +133,14 @@ git push --tags
 团队成员通过 commit SHA 或 tag pin：
 
 ```json
-"devDependencies": { "foodmax-ai-config": "github:foodmax/ai-config-init#v0.2.0" }
+"devDependencies": { "foodmax-ai-config": "https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/bgs2026/kos/poc/foodmax-ai-config-init.git#v0.2.0" }
 ```
+
+### 改了 MCP 注册参数时
+
+如果 release 里改了 `src/lib/constants.ts` 中任何 MCP 的注册命令（例如 pin 版本、加 flag、换 transport），普通 `update` 因为 idempotency 检查会 skip 已注册的 MCP。release notes 里要点名：
+
+> ⚠️ 本次升级修改了 MCP 注册参数，请用 `npx foodmax-ai update --force-mcp` 升级。
 
 ---
 
@@ -132,11 +150,11 @@ git push --tags
 |---|---|
 | `claude: command not found` | 装 [Claude Code](https://claude.com/claude-code) |
 | `verify` 在 CI exit 1 | 本地 `npx foodmax-ai status --diff` 看 drift |
-| 第一次 init 拉不下来 repo | `gh auth login` 或检查 SSH key 是否能 clone `foodmax/ai-config-init` |
+| 第一次 init 拉不下来 repo | 检查 git credential helper 或 SSO，能否 clone `https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/bgs2026/kos/poc/foodmax-ai-config-init.git` |
 | `pnpm lock` CI 失败 | 本地跑 `pnpm lock` 并把 `.locked.json` 一起 commit |
 | feishu MCP 所有调用 401 | `echo $LARK_APP_ID` 看是不是空；写到 `~/.zshrc` 后**重启** Claude Code |
 | `lark-cli: command not found` 但 `init` 报 installed | 新装的 npm global bin 还没 source；开新 terminal 或 `source ~/.zshrc` |
-| `mcp add` 报 already exists | `claude mcp list` 看一眼，已注册就不用动；`init` 下次跑会自动跳过 |
+| `init`/`update` 输出 `MCP "X" already registered` 的 warning | 你本地已有同名 MCP，团队规范的注册参数没贴上。`claude mcp list` 确认；想替换成团队版跑 `npx foodmax-ai update --force-mcp` |
 
 ---
 

@@ -89,6 +89,16 @@ test('registerPlaywrightMcp: skips when already registered', async () => {
   expect(calls).toHaveLength(0);
 });
 
+test('registerPlaywrightMcp: skipped result carries hint about --force-mcp', async () => {
+  const r = await registerPlaywrightMcp({
+    exec: async () => ({ stdout: '', stderr: '' }),
+    listMcpNames: async () => ['playwright'],
+  });
+  expect(r.status).toBe('skipped');
+  expect(r.hint).toBeTruthy();
+  expect(r.hint).toMatch(/--force-mcp/);
+});
+
 test('registerPlaywrightMcp: failed on exec throw', async () => {
   const exec: Exec = async () => {
     throw new Error('mcp add boom');
@@ -135,6 +145,16 @@ test('registerFeishuMcp: skips when already registered', async () => {
   });
   expect(r.status).toBe('skipped');
   expect(called).toBe(false);
+});
+
+test('registerFeishuMcp: skipped result carries hint about --force-mcp', async () => {
+  const r = await registerFeishuMcp({
+    exec: async () => ({ stdout: '', stderr: '' }),
+    listMcpNames: async () => ['feishu'],
+  });
+  expect(r.status).toBe('skipped');
+  expect(r.hint).toBeTruthy();
+  expect(r.hint).toMatch(/--force-mcp/);
 });
 
 test('registerFeishuMcp: failed on exec throw', async () => {

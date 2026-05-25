@@ -19,6 +19,13 @@ export interface IntegrationResult {
   name: string;
   status: 'installed' | 'skipped' | 'failed';
   reason?: string;
+  /**
+   * Actionable warning for the user. Set when status='skipped' but the skip
+   * may hide a real configuration drift (e.g., an MCP is registered under the
+   * managed name but with command/args we can't verify match team defaults).
+   * The init/update log layer renders this as a warning line.
+   */
+  hint?: string;
 }
 
 export interface IntegrationOptions {
@@ -111,6 +118,7 @@ export async function registerPlaywrightMcp(
         name: 'playwright-mcp',
         status: 'skipped',
         reason: `MCP "${PLAYWRIGHT_MCP_NAME}" already registered`,
+        hint: `An MCP named "${PLAYWRIGHT_MCP_NAME}" is already registered with Claude — its command/args may differ from the team default. To re-register with team defaults: \`npx foodmax-ai update --force-mcp\``,
       };
     }
     await exec('claude', [
@@ -144,6 +152,7 @@ export async function registerFeishuMcp(
         name: 'feishu-mcp',
         status: 'skipped',
         reason: `MCP "${FEISHU_MCP_NAME}" already registered`,
+        hint: `An MCP named "${FEISHU_MCP_NAME}" is already registered with Claude — its command/args may differ from the team default (which uses env-var placeholders for credentials, not hardcoded values). To re-register with team defaults: \`npx foodmax-ai update --force-mcp\``,
       };
     }
     // The shell wrapper preserves the literal $LARK_APP_ID / $LARK_APP_SECRET

@@ -11,12 +11,14 @@ import {
   projectLockfileName,
 } from '../lib/paths.js';
 import { installPlugin, defaultExec, type Exec } from '../lib/plugin-install.js';
-import { ok, fail, info } from '../lib/log.js';
+import { runAllIntegrations } from '../lib/integrations.js';
+import { ok, fail, info, warn } from '../lib/log.js';
 import {
   FOODMAX_PACKAGE as PACKAGE_NAME,
   FOODMAX_SOURCE as SOURCE,
   FOODMAX_MARKETPLACE as MARKETPLACE_NAME,
   FOODMAX_PLUGIN as PLUGIN_NAME,
+  MANAGED_MCP_NAMES,
 } from '../lib/constants.js';
 
 const _exec = promisify(execFile);
@@ -26,6 +28,12 @@ export interface RunUpdateOptions {
   packageRootOverride?: string;
   reinstall?: () => Promise<void>;
   exec?: Exec;
+  /** Remove managed MCPs before re-registering so changed args take effect. */
+  forceMcp?: boolean;
+  /** Test injection so update does not shell out to `which lark-cli`. */
+  larkCliPresent?: () => Promise<boolean>;
+  /** Test injection so update does not run real `claude mcp list`. */
+  listMcpNames?: () => Promise<string[]>;
 }
 
 export async function runUpdate(opts: RunUpdateOptions): Promise<void> {
@@ -61,6 +69,41 @@ export async function runUpdate(opts: RunUpdateOptions): Promise<void> {
     return;
   }
   const internalLock = readLockfile(internalLockPath);
+
+  // Force-mcp: remove managed MCPs so re-registration picks up new args
+  // (e.g., pinned version, new flags). Failures are tolerated — an MCP that
+  // was never registered will produce an error from `claude mcp remove` and
+  // that is fine.
+  if (opts.forceMcp) {
+    for (const name of MANAGED_MCP_NAMES) {
+      try {
+        await exec('claude', ['mcp', 'remove', name, '--scope', 'user']);
+        console.log(info(`Removed MCP "${name}" for fresh registration`));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.log(info(`(MCP "${name}" remove skipped: ${msg.slice(0, 120)})`));
+      }
+    }
+  }
+
+  // Re-run integrations: catches new integrations added since init, and (with
+  // --force-mcp) re-registers MCPs whose args changed in the package.
+  const integrationResults = await runAllIntegrations({
+    exec,
+    larkCliPresent: opts.larkCliPresent,
+    listMcpNames: opts.listMcpNames,
+  });
+  for (const r of integrationResults) {
+    if (r.status === 'installed') {
+      console.log(ok(`${r.name} installed`));
+    } else if (r.status === 'skipped') {
+      console.log(info(`${r.name} skipped${r.reason ? ` (${r.reason})` : ''}`));
+      if (r.hint) console.log(warn(r.hint));
+    } else {
+      console.log(warn(`${r.name} install failed${r.reason ? `: ${r.reason}` : ''}`));
+    }
+  }
+
   const projectLockPath = join(opts.cwd, projectLockfileName());
   const existing = (existsSync(projectLockPath)
     ? JSON.parse(readFileSync(projectLockPath, 'utf8'))
@@ -97,10 +140,14 @@ function readPackageVersion(pkgRoot: string): string {
 export function registerUpdate(program: Command): void {
   program
     .command('update')
-    .description('Re-fetch latest, refresh plugin, rewrite project lockfile')
-    .action(async () => {
+    .description('Re-fetch latest, refresh plugin, re-run integrations, rewrite project lockfile')
+    .option('--force-mcp', 'Remove and re-register managed MCPs (picks up changed args)')
+    .action(async (opts) => {
       try {
-        await runUpdate({ cwd: process.cwd() });
+        await runUpdate({
+          cwd: process.cwd(),
+          forceMcp: Boolean(opts.forceMcp),
+        });
       } catch (err) {
         console.error(fail(err instanceof Error ? err.message : String(err)));
         process.exit(2);

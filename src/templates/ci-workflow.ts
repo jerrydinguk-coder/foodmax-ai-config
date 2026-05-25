@@ -14,7 +14,7 @@ jobs:
         with:
           node-version: '20'
       - name: Install foodmax-ai-config
-        run: npm install --no-save github:foodmax/ai-config-init#main
+        run: npm install --no-save https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/bgs2026/kos/poc/foodmax-ai-config-init.git#main
       - name: Verify
         run: npx foodmax-ai verify --strict
 `;

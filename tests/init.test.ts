@@ -56,7 +56,7 @@ test('init adds foodmax-ai-config to package.json devDependencies', async () => 
     ...baseRunInit,
   });
   const pkg = JSON.parse(readFileSync(join(project.dir, 'package.json'), 'utf8'));
-  expect(pkg.devDependencies['foodmax-ai-config']).toContain('github:foodmax/ai-config-init');
+  expect(pkg.devDependencies['foodmax-ai-config']).toContain('foodmax-ai-config-init.git');
 });
 
 test('init writes .gitignore with settings.local.json', async () => {
@@ -98,7 +98,12 @@ test('init invokes plugin install', async () => {
   expect(execCalls.length).toBeGreaterThanOrEqual(2);
   expect(execCalls[0]).toEqual([
     'claude',
-    ['plugin', 'marketplace', 'add', 'github:foodmax/ai-config-init'],
+    [
+      'plugin',
+      'marketplace',
+      'add',
+      'https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/bgs2026/kos/poc/foodmax-ai-config-init.git',
+    ],
   ]);
 });
 
