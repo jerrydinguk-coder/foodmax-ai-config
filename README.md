@@ -26,8 +26,35 @@ npx -y github:foodmax/ai-config-init init
 4. 在 `.github/workflows/` 写一个 verify workflow
 5. 安装 Claude Code plugin 到 `~/.claude/`（让 skills/hooks 全局可用）
 6. 写一个 `.foodmax-ai.lock.json` 记录当前版本
+7. 自动装 4 个团队默认集成（见下方"`init` installs what?"）
 
 **前置条件：** 已安装 [Claude Code](https://claude.com/claude-code)、Node 18+、本机 git 有访问 `foodmax/ai-config-init` 私有 repo 的权限（SSH key 或 `gh auth login`）。
+
+### `init` installs what?
+
+除了 `foodmax-ai-config` plugin 本身，`init` 还会自动落 4 个生产力集成（已注册的会跳过，不会重复装）：
+
+| 集成 | 装什么 | 怎么落 |
+|---|---|---|
+| superpowers plugin | obra/superpowers — TDD / brainstorming / parallel-agents 等元 skill | `claude plugin install superpowers@superpowers-dev --scope user` |
+| Playwright MCP | 让 Claude 能开浏览器自动化 | `claude mcp add playwright --scope user -- npx -y @playwright/mcp@latest` |
+| Feishu MCP | 飞书机器人 / 多维表格 / 消息 API | `claude mcp add feishu --scope user -- sh -c '…lark-mcp…'`（用环境变量读 token） |
+| `@larksuite/cli` | `lark-cli` 命令行（机器人调试、登录、推消息） | 检测到没装就 `npm install -g @larksuite/cli` |
+
+**这些集成是 best-effort：** 任何一个失败不会让 `init` 整体退出，只会打 `⚠` 警告。如果你想后悔某个，手动 `claude plugin remove <name>` / `claude mcp remove <name>` / `npm uninstall -g @larksuite/cli` 即可。
+
+### Setup Feishu credentials
+
+Feishu MCP 在每次启动时会从你的 shell env 读 `$LARK_APP_ID` / `$LARK_APP_SECRET`。`init` **不会** 帮你写这两个变量（团队公用一组 token 不安全）。第一次 `init` 之后，从团队飞书管理员那里拿 token，或在 [open.feishu.cn](https://open.feishu.cn) 自建应用拿，然后：
+
+```bash
+# Get from team Feishu admin or your own app at open.feishu.cn
+echo 'export LARK_APP_ID=cli_xxxxx' >> ~/.zshrc
+echo 'export LARK_APP_SECRET=xxxxx' >> ~/.zshrc
+# 重启 Claude Code 让 MCP 进程读到新 env
+```
+
+没设也没事，feishu MCP 会启动，但每次调用都会 `lark unauthorized`。
 
 ### 重启 Claude Code
 
@@ -107,6 +134,9 @@ git push --tags
 | `verify` 在 CI exit 1 | 本地 `npx foodmax-ai status --diff` 看 drift |
 | 第一次 init 拉不下来 repo | `gh auth login` 或检查 SSH key 是否能 clone `foodmax/ai-config-init` |
 | `pnpm lock` CI 失败 | 本地跑 `pnpm lock` 并把 `.locked.json` 一起 commit |
+| feishu MCP 所有调用 401 | `echo $LARK_APP_ID` 看是不是空；写到 `~/.zshrc` 后**重启** Claude Code |
+| `lark-cli: command not found` 但 `init` 报 installed | 新装的 npm global bin 还没 source；开新 terminal 或 `source ~/.zshrc` |
+| `mcp add` 报 already exists | `claude mcp list` 看一眼，已注册就不用动；`init` 下次跑会自动跳过 |
 
 ---
 
