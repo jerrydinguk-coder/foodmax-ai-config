@@ -71,3 +71,8 @@ test('parseLatestVersion returns first version found', () => {
 test('parseLatestVersion returns null when no versions present', () => {
   expect(parseLatestVersion(`# CHANGELOG\n`)).toBeNull();
 });
+
+test('parseLatestVersion accepts changesets default format (no brackets)', () => {
+  const md = `# CHANGELOG\n\n## 0.2.0\n\n### Minor Changes\n\n- abc: thing\n\n## [0.1.0] - 2026-05-26\n`;
+  expect(parseLatestVersion(md)).toBe('0.2.0');
+});

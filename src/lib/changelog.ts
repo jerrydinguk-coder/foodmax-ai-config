@@ -37,6 +37,8 @@ export function prependChangelogEntry(existing: string, entry: ChangelogEntry): 
 }
 
 export function parseLatestVersion(md: string): string | null {
-  const m = md.match(/##\s+\[([^\]]+)\]/);
+  // Matches both `## [X.Y.Z]` (our prependChangelogEntry) and `## X.Y.Z`
+  // (changesets default writer).
+  const m = md.match(/^##\s+\[?([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?)\]?/m);
   return m?.[1] ?? null;
 }
