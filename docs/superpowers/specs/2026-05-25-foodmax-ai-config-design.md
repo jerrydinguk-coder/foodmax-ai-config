@@ -5,6 +5,8 @@
 > **作者**：epingpong（with Claude Opus 4.7）
 > **scope 预估**：2–3 人天（与原简报一致）
 
+> ⚠️ **历史快照 — 设计阶段意图，部分细节与最终实现不符。** 文中举例的 `foodmax-pr-description` / `foodmax-new-module` skill **未实现**（只是设计期占位名）。实际 `skills/` 落地的是 10 个 OBRA 社区 skill（docx / pdf / pptx / xlsx / prd / frontend-design / theme-factory / webapp-testing / skill-creator / find-skills）。当前真实列表见 [README "预装 Skill"](../../../README.md#预装-skill)。
+
 ---
 
 ## 1. Executive Summary

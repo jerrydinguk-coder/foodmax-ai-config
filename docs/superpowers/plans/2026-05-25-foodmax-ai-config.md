@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> ⚠️ **历史快照 — 2026-05-25 计划阶段产物，部分细节与最终实现不符。** 文中举例的 `foodmax-pr-description` / `foodmax-new-module` skill **未实现**（只是计划期占位名）。实际 `skills/` 落地的是 10 个 OBRA 社区 skill。当前真实列表见 [README "预装 Skill"](../../../README.md#预装-skill)。
+
 **Goal:** Build a dual-form repository (Claude Code plugin + thin npm CLI) that bootstraps FoodMax team-wide AI configuration via `npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git init`, with lockfile-based integrity verification (soft warn / strict CI mode).
 
 **Architecture:** Single TypeScript repo doubles as (a) a Claude Code plugin (skills + hooks + CLAUDE.md + `.claude-plugin/marketplace.json`) and (b) an npm package exposing the `foodmax-ai` CLI. The CLI orchestrates `claude plugin marketplace add/install` calls + writes project-level files + manages two lockfiles (package-internal `.locked.json` for content integrity, project-internal `.foodmax-ai.lock.json` for version pinning).
@@ -1432,7 +1434,7 @@ git commit -m "feat(lib): idempotent CLAUDE.md region merge + gitignore append"
 ```ts
 export const PROJECT_CLAUDE_MD_BLOCK = `## FoodMax 团队 AI 配置
 
-本项目使用 [foodmax-ai-config](https://github.com/foodmax/ai-config-init) 管理 AI 助手配置。
+本项目使用 [foodmax-ai-config](https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init) 管理 AI 助手配置。
 
 ### 强制规则
 
