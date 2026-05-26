@@ -1,0 +1,41 @@
+# Pre-push: enforce a changeset (or [skip-changeset] override) on non-main pushes.
+# Skip when:
+#   - pushing the main branch (CI bot pushes versioning commits there)
+#   - pushing tags only (`git push --tags` with no refs)
+#   - any commit in the push range contains [skip-changeset]
+#
+# A push from a feature branch must include at least one .changeset/*.md (not README.md)
+# in the commits being pushed, otherwise the CI release pipeline will skip versioning silently.
+
+current_branch="$(git rev-parse --abbrev-ref HEAD)"
+if [ "$current_branch" = "main" ]; then
+  exit 0
+fi
+
+# Determine commit range being pushed. Fallback to "everything since origin/main"
+# if no upstream is configured yet.
+if git rev-parse --abbrev-ref --symbolic-full-name "@{u}" >/dev/null 2>&1; then
+  range="@{u}..HEAD"
+else
+  range="origin/main..HEAD"
+fi
+
+# Honor [skip-changeset] in any of the push-range commit messages
+if git log "$range" --pretty=format:'%s%n%b' 2>/dev/null | grep -qi '\[skip-changeset\]'; then
+  exit 0
+fi
+
+# Look for a real changeset file (not README.md) in the changed files of the range
+if git log "$range" --name-only --pretty=format: 2>/dev/null \
+     | grep -E '^\.changeset/.+\.md$' \
+     | grep -v 'README.md$' \
+     | grep -q .; then
+  exit 0
+fi
+
+cat <<'EOF' >&2
+❌ No changeset found in commits being pushed.
+   Run:        pnpm changeset
+   Or skip:    add [skip-changeset] to a commit message (only for pure docs/test/ci work).
+EOF
+exit 1
