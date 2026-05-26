@@ -67,12 +67,22 @@ test('registerPlaywrightMcp: registers when absent', async () => {
     listMcpNames: async () => ['chrome-devtools'],
   });
   expect(r.status).toBe('installed');
-  expect(calls).toEqual([
-    [
-      'claude',
-      ['mcp', 'add', 'playwright', '--scope', 'user', '--', 'npx', '-y', '@playwright/mcp@latest'],
-    ],
+  expect(calls).toHaveLength(1);
+  const [cmd, args] = calls[0]!;
+  expect(cmd).toBe('claude');
+  // Match args.slice(0, 8) exactly; final arg (package@version) checked by regex
+  // so a version bump doesn't churn this assertion.
+  expect(args.slice(0, 8)).toEqual([
+    'mcp',
+    'add',
+    'playwright',
+    '--scope',
+    'user',
+    '--',
+    'npx',
+    '-y',
   ]);
+  expect(args[8]).toMatch(/^@playwright\/mcp@\d+\.\d+\.\d+$/);
 });
 
 test('registerPlaywrightMcp: skips when already registered', async () => {
@@ -130,7 +140,7 @@ test('registerFeishuMcp: registers when absent (uses sh -c wrapper, env vars NOT
   const shellCmd = args[args.length - 1]!;
   expect(shellCmd).toContain('$LARK_APP_ID');
   expect(shellCmd).toContain('$LARK_APP_SECRET');
-  expect(shellCmd).toContain('@larksuiteoapi/lark-mcp');
+  expect(shellCmd).toMatch(/@larksuiteoapi\/lark-mcp@\d+\.\d+\.\d+/);
 });
 
 test('registerFeishuMcp: skips when already registered', async () => {
