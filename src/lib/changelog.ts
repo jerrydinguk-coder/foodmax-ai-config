@@ -38,5 +38,5 @@ export function prependChangelogEntry(existing: string, entry: ChangelogEntry): 
 
 export function parseLatestVersion(md: string): string | null {
   const m = md.match(/##\s+\[([^\]]+)\]/);
-  return m ? m[1] : null;
+  return m?.[1] ?? null;
 }
