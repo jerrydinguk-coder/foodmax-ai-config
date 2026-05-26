@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "channels": {
+    "latest": {
+      "version": "0.1.0",
+      "tag": "v0.1.0",
+      "publishedAt": "2026-05-26T00:00:00Z"
+    }
+  },
+  "deprecated": [],
+  "minSupportedVersion": "0.1.0",
+  "peerRequirements": {
+    "claudeCode": ">=1.0.0",
+    "node": ">=18.0.0"
+  }
+}
