@@ -23,6 +23,7 @@ import {
   resolveVersion,
   type VersionsJson,
 } from '../lib/versions.js';
+import { warnIfDeprecated, requireNotBlocked } from '../lib/deprecation.js';
 
 const _exec = promisify(execFile);
 
@@ -78,6 +79,8 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
 
   const resolved = resolveVersion(versionsJson, { version: opts.version, channel: opts.channel });
   const pinnedSource = `${SOURCE}#${resolved.tag}`;
+  warnIfDeprecated(versionsJson, resolved.version);
+  requireNotBlocked(versionsJson, resolved.version);
 
   const pkgRoot = opts.packageRootOverride ?? join(opts.cwd, 'node_modules', PACKAGE_NAME);
   if (!existsSync(join(pkgRoot, 'package.json'))) {

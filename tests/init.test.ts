@@ -1,4 +1,4 @@
-import { test, expect, beforeEach, afterEach } from 'vitest';
+import { test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { runInit } from '../src/commands/init.js';
@@ -277,4 +277,56 @@ test('init blocks when Claude Code version is below peerRequirements', async () 
       claudeDetect: async () => ({ ok: true as const, version: '0.5.0' }),
     })
   ).rejects.toThrow(/Claude Code 0\.5\.0.*>=1\.0\.0/);
+});
+
+test('init refuses to install a version marked severity=block', async () => {
+  const fakeBlocked: VersionsJson = {
+    ...fakeVersionsJson,
+    deprecated: [
+      {
+        version: '1.2.3',
+        reason: 'critical: MCP secret leak',
+        fixedIn: '1.2.4',
+        deprecatedAt: '2026-05-20T00:00:00Z',
+        severity: 'block',
+      },
+    ],
+  };
+  await expect(
+    runInit({
+      cwd: project.dir,
+      packageRootOverride: pkgRoot,
+      ...baseRunInit,
+      fetchVersions: async () => fakeBlocked,
+      version: '1.2.3',
+    })
+  ).rejects.toThrow(/blocked/i);
+});
+
+test('init warns but proceeds for warn-severity deprecation', async () => {
+  const fakeWarn: VersionsJson = {
+    ...fakeVersionsJson,
+    deprecated: [
+      {
+        version: '1.2.3',
+        reason: 'cosmetic issue',
+        fixedIn: '1.2.4',
+        deprecatedAt: '2026-05-20T00:00:00Z',
+      },
+    ],
+  };
+  const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    await runInit({
+      cwd: project.dir,
+      packageRootOverride: pkgRoot,
+      ...baseRunInit,
+      fetchVersions: async () => fakeWarn,
+      version: '1.2.3',
+    });
+    const allOutput = spy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(allOutput).toMatch(/deprecated/i);
+  } finally {
+    spy.mockRestore();
+  }
 });
