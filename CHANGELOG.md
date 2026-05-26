@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## 0.2.1
+
+### Patch Changes
+
+- fd162d4: Pre-rollout BLOCKER fixes:
+
+  - session-start-banner.sh: correct install URL (was a stale github:... reference that returned 404)
+  - marketplace.json: sync plugin version with package.json; auto-sync in version-packages.ts going forward
+  - README: remove `--channel beta` references (no beta channel exists in versions.json yet)
+
+  Includes regression-guard tests so each blocker class is caught in CI.
+
 ## 0.2.0
 
 ### Minor Changes

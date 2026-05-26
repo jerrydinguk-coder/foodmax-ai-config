@@ -1,12 +1,14 @@
 {
   "name": "foodmax-ai-config",
-  "owner": { "name": "FoodMax Engineering" },
+  "owner": {
+    "name": "FoodMax Engineering"
+  },
   "plugins": [
     {
       "name": "foodmax-ai-config",
       "source": ".",
       "description": "FoodMax team-wide AI rules, skills, and hooks",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "hooks": [
         {
           "event": "SessionStart",
