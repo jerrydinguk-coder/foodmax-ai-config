@@ -16,7 +16,7 @@
 在你的 FoodMax 项目根目录（例如 `~/CodeBuddy/foodmax-backend/`）下跑：
 
 ```bash
-npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/bgs2026/kos/poc/foodmax-ai-config-init.git init
+npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git init
 ```
 
 它会：
@@ -28,7 +28,7 @@ npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/bgs2026/k
 6. 写一个 `.foodmax-ai.lock.json` 记录当前版本
 7. 自动装 4 个团队默认集成（见下方"`init` installs what?"）
 
-**前置条件：** 已安装 [Claude Code](https://claude.com/claude-code)、Node 18+、本机 git 有访问 Codeup `bgs2026/kos/poc/foodmax-ai-config-init` 私有 repo 的权限（公司 SSO 或 git credential helper）。
+**前置条件：** 已安装 [Claude Code](https://claude.com/claude-code)、Node 18+、本机 git 有访问 Codeup `kos/dev-tools/foodmax-ai-config-init` 私有 repo 的权限（公司 SSO 或 git credential helper）。
 
 ### `init` installs what?
 
@@ -91,7 +91,7 @@ npx foodmax-ai update --force-mcp
 
 直接改 `node_modules/foodmax-ai-config/skills/.../SKILL.md` 就行。本地 `verify` 是软警告不挡路。
 
-- 实验成功想保留 → 提 PR 到 Codeup `bgs2026/kos/poc/foodmax-ai-config-init`
+- 实验成功想保留 → 提 PR 到 Codeup `kos/dev-tools/foodmax-ai-config-init`
 - 想放弃 → `npx foodmax-ai repair`
 
 ---
@@ -133,7 +133,7 @@ git push --tags
 团队成员通过 commit SHA 或 tag pin：
 
 ```json
-"devDependencies": { "foodmax-ai-config": "https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/bgs2026/kos/poc/foodmax-ai-config-init.git#v0.2.0" }
+"devDependencies": { "foodmax-ai-config": "https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git#v0.2.0" }
 ```
 
 ### 改了 MCP 注册参数时
@@ -150,7 +150,7 @@ git push --tags
 |---|---|
 | `claude: command not found` | 装 [Claude Code](https://claude.com/claude-code) |
 | `verify` 在 CI exit 1 | 本地 `npx foodmax-ai status --diff` 看 drift |
-| 第一次 init 拉不下来 repo | 检查 git credential helper 或 SSO，能否 clone `https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/bgs2026/kos/poc/foodmax-ai-config-init.git` |
+| 第一次 init 拉不下来 repo | 检查 git credential helper 或 SSO，能否 clone `https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git` |
 | `pnpm lock` CI 失败 | 本地跑 `pnpm lock` 并把 `.locked.json` 一起 commit |
 | feishu MCP 所有调用 401 | `echo $LARK_APP_ID` 看是不是空；写到 `~/.zshrc` 后**重启** Claude Code |
 | `lark-cli: command not found` 但 `init` 报 installed | 新装的 npm global bin 还没 source；开新 terminal 或 `source ~/.zshrc` |

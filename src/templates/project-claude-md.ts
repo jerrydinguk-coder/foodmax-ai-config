@@ -1,6 +1,6 @@
 export const PROJECT_CLAUDE_MD_BLOCK = `## FoodMax 团队 AI 配置
 
-本项目使用 [foodmax-ai-config](https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/bgs2026/kos/poc/foodmax-ai-config-init) 管理 AI 助手配置。
+本项目使用 [foodmax-ai-config](https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init) 管理 AI 助手配置。
 
 ### 强制规则
 

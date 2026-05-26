@@ -102,7 +102,7 @@ test('init invokes plugin install', async () => {
       'plugin',
       'marketplace',
       'add',
-      'https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/bgs2026/kos/poc/foodmax-ai-config-init.git',
+      'https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git',
     ],
   ]);
 });
