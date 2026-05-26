@@ -10,7 +10,7 @@ test('cli --help lists all six commands', () => {
   }
 });
 
-test('cli --version prints semver', () => {
-  const out = execSync(`${CLI} --version`, { encoding: 'utf8' });
+test('cli --pkg-version prints semver (renamed from --version to free that flag for subcommands)', () => {
+  const out = execSync(`${CLI} --pkg-version`, { encoding: 'utf8' });
   expect(out.trim()).toMatch(/^\d+\.\d+\.\d+$/);
 });
