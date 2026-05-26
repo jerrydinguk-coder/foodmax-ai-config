@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { resolveVersion, checkDeprecated, type VersionsJson, fetchVersions, type FetchVersionsDeps } from '../src/lib/versions.js';
+import { resolveVersion, checkDeprecated, type VersionsJson, fetchVersions, type FetchVersionsDeps, type DeprecatedEntry } from '../src/lib/versions.js';
 
 const fakeVersions: VersionsJson = {
   schemaVersion: 1,
@@ -83,4 +83,25 @@ test('fetchVersions throws when both raw URL and shallow clone fail', async () =
     shallowCloneVersionsJson: async () => { throw new Error('git failed'); },
   };
   await expect(fetchVersions(deps)).rejects.toThrow(/versions\.json/i);
+});
+
+test('DeprecatedEntry accepts optional severity field', () => {
+  const withSeverity: DeprecatedEntry = {
+    version: '1.0.0',
+    reason: 'critical',
+    fixedIn: '1.0.1',
+    deprecatedAt: '2026-05-26T00:00:00Z',
+    severity: 'block',
+  };
+  expect(withSeverity.severity).toBe('block');
+});
+
+test('DeprecatedEntry without severity is valid (defaults to warn semantically)', () => {
+  const withoutSeverity: DeprecatedEntry = {
+    version: '1.0.0',
+    reason: 'minor issue',
+    fixedIn: '1.0.1',
+    deprecatedAt: '2026-05-26T00:00:00Z',
+  };
+  expect(withoutSeverity.severity).toBeUndefined();
 });

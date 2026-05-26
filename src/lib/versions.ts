@@ -17,6 +17,12 @@ export interface DeprecatedEntry {
   reason: string;
   fixedIn: string;
   deprecatedAt: string;
+  /**
+   * How strict the deprecation is:
+   * - "warn" (default): print warning, allow install/update
+   * - "block": refuse install/update; caller must explicitly pick a non-deprecated version
+   */
+  severity?: 'warn' | 'block';
 }
 
 export interface VersionsJson {
