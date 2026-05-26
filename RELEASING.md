@@ -7,33 +7,41 @@
 3. `git add .changeset/*.md src/ tests/` + commit + push + 提 PR
 4. CI 会拦没 changeset 的 PR（除非 commit message 含 `[skip-changeset]`，仅适用于纯 docs/CI/test 改动）
 
-## Release 流程（CI 自动）
+## Release 流程（当前：手动 / Sprint 3+：CI 自动）
+
+> ⚠️ **Sprint 2 现状**：Codeup 不自动识别仓库里的 CI 文件，需要管理员接入 **云效 Flow** 才能自动触发流水线（详见 [ci-reference-codeup-flow.yml](docs/superpowers/ci-reference-codeup-flow.yml)）。在 Flow 接入完成前，release 完全手动跑。**所有自动化脚本本身都可用**（`pnpm version-packages` + `pnpm release`），只是缺一个 trigger。
+
+### 手动 release（当前默认）
+
+```bash
+git checkout main && git pull
+pnpm test && pnpm typecheck      # 自检
+pnpm version-packages            # 累积所有 .changeset/*.md，bump + 写 CHANGELOG，commit [skip ci]，push 到 main
+pnpm release                     # 调用 src/scripts/release.ts：tag vX.Y.Z + push tag + update versions.json + commit + push
+```
+
+`version-packages` 没 changesets 就 no-op 退出，安全可重入。
+`release` 检测 CHANGELOG 最新版本不匹配 package.json 时会拦截（防止跳过 `pnpm version-packages` 漏发 changelog）。
+
+### 未来：Flow 接入后自动 release
 
 ```
 你 merge PR → main
     ↓
-Codeup pipeline: version-packages job
+Flow: version-packages job
     ↓
-机器人累积 .changeset/*.md → bump package.json version → 写 CHANGELOG.md → commit [skip ci] + push
+机器人累积 .changeset/*.md → bump → 写 CHANGELOG → commit [skip ci] + push
     ↓
-Codeup pipeline 检测到 "chore(release): version packages" commit
+Flow 检测 "chore(release): version packages" commit
     ↓
-release job: git tag vX.Y.Z + push tag + update versions.json["channels"]["latest"] + commit [skip ci] + push
+release job: git tag + push tag + update versions.json + commit + push
 ```
 
-**你需要做的：** 只是 merge 普通 PR。版本号、CHANGELOG、tag、versions.json 全部自动。
-
-## 手动 release（紧急 / debug 用）
-
-如果 CI 挂了需要手工放一个 release：
-
-```bash
-git checkout main && git pull
-pnpm changeset version           # 累积所有 changesets，bump + 写 CHANGELOG
-git add . && git commit -m "chore(release): version packages"
-git push
-pnpm release                     # 调用 src/scripts/release.ts: tag + push + 更新 versions.json
-```
+接入步骤（管理员）：
+1. 在 flow.aliyun.com 创建 pipeline，关联本 Codeup 仓库
+2. 把 [ci-reference-codeup-flow.yml](docs/superpowers/ci-reference-codeup-flow.yml) 的三个 stage（test / version-packages / release）逻辑映射到 Flow 配置
+3. 在 Flow secrets 配置 `CI_BOT_TOKEN`（服务账号 token）
+4. 接入完成后回头删本节"未来"二字，把"当前手动"section 标记为 fallback
 
 ## MCP 注册参数变更的特殊情况
 

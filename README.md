@@ -154,11 +154,14 @@ git add . && git commit -m "feat: ..." && git push
 
 `pre-push` hook 会拦没 changeset 的 PR（除非 commit message 有 `[skip-changeset]`）。
 
-PR merge 到 main 后，Codeup CI 自动：
-1. 累积所有 `.changeset/*.md` → bump version → 写 CHANGELOG.md → 提 "Version Packages" PR
-2. 你 merge 那个 PR → CI 自动 tag + push + 更新 `versions.json["channels"]["latest"]`
+PR merge 到 main 后，维护者本地跑：
 
-零手动 `git tag`。详见 [RELEASING.md](RELEASING.md)。
+```bash
+pnpm version-packages    # 累积 changesets → bump version + 写 CHANGELOG
+pnpm release             # tag + push + 更新 versions.json
+```
+
+⚠️ Sprint 2 当前 release 是手动的（Codeup 仓库不自动识别 CI 文件，等管理员接入云效 Flow 才能自动化）。详见 [RELEASING.md](RELEASING.md)。
 
 团队成员通过 tag pin（自动获得最新可用版本）：
 
