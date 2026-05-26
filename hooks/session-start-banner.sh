@@ -12,6 +12,6 @@ if [[ -f ".foodmax-ai.lock.json" ]]; then
   fi
 else
   echo "FoodMax AI config: not yet initialized in this project."
-  echo "  → Run: npx -y github:foodmax/ai-config-init init"
+  echo "  → Run: npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git init"
 fi
 exit 0

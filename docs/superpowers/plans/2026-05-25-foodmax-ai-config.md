@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a dual-form repository (Claude Code plugin + thin npm CLI) that bootstraps FoodMax team-wide AI configuration via `npx -y github:foodmax/ai-config-init init`, with lockfile-based integrity verification (soft warn / strict CI mode).
+**Goal:** Build a dual-form repository (Claude Code plugin + thin npm CLI) that bootstraps FoodMax team-wide AI configuration via `npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git init`, with lockfile-based integrity verification (soft warn / strict CI mode).
 
 **Architecture:** Single TypeScript repo doubles as (a) a Claude Code plugin (skills + hooks + CLAUDE.md + `.claude-plugin/marketplace.json`) and (b) an npm package exposing the `foodmax-ai` CLI. The CLI orchestrates `claude plugin marketplace add/install` calls + writes project-level files + manages two lockfiles (package-internal `.locked.json` for content integrity, project-internal `.foodmax-ai.lock.json` for version pinning).
 
@@ -1201,7 +1201,7 @@ test('installPlugin invokes marketplace add then install', async () => {
   };
 
   const r = await installPlugin({
-    source: 'github:foodmax/ai-config-init',
+    source: 'https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git',
     marketplaceName: 'foodmax-ai-config',
     pluginName: 'foodmax-ai-config',
     scope: 'user',
@@ -1210,7 +1210,7 @@ test('installPlugin invokes marketplace add then install', async () => {
 
   expect(r.ok).toBe(true);
   expect(calls).toHaveLength(2);
-  expect(calls[0]).toEqual(['claude', ['plugin', 'marketplace', 'add', 'github:foodmax/ai-config-init']]);
+  expect(calls[0]).toEqual(['claude', ['plugin', 'marketplace', 'add', 'https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git']]);
   expect(calls[1]).toEqual(['claude', ['plugin', 'install', 'foodmax-ai-config@foodmax-ai-config', '--scope', 'user']]);
 });
 
@@ -1260,7 +1260,7 @@ export const defaultExec: Exec = async (cmd, args) => {
 };
 
 export interface InstallOptions {
-  source: string;          // e.g. github:foodmax/ai-config-init
+  source: string;          // e.g. https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git
   marketplaceName: string; // logical name registered with `marketplace add`
   pluginName: string;      // plugin name from marketplace.json
   scope: 'user' | 'project' | 'local';
@@ -1463,7 +1463,7 @@ jobs:
         with:
           node-version: '20'
       - name: Install foodmax-ai-config
-        run: npm install --no-save github:foodmax/ai-config-init#main
+        run: npm install --no-save https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git#main
       - name: Verify
         run: npx foodmax-ai verify --strict
 `;
@@ -1617,7 +1617,7 @@ test('init adds foodmax-ai-config to package.json devDependencies', async () => 
     yes: true,
   });
   const pkg = JSON.parse(readFileSync(join(project.dir, 'package.json'), 'utf8'));
-  expect(pkg.devDependencies['foodmax-ai-config']).toContain('github:foodmax/ai-config-init');
+  expect(pkg.devDependencies['foodmax-ai-config']).toContain('https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git');
 });
 
 test('init writes .gitignore with settings.local.json', async () => {
@@ -1668,7 +1668,7 @@ test('init invokes plugin install', async () => {
   expect(execCalls.length).toBeGreaterThanOrEqual(2);
   expect(execCalls[0]).toEqual([
     'claude',
-    ['plugin', 'marketplace', 'add', 'github:foodmax/ai-config-init'],
+    ['plugin', 'marketplace', 'add', 'https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git'],
   ]);
 });
 
@@ -1729,7 +1729,7 @@ import { ok, warn, fail, info, bold } from '../lib/log.js';
 
 const _exec = promisify(execFile);
 
-const SOURCE = 'github:foodmax/ai-config-init';
+const SOURCE = 'https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git';
 const MARKETPLACE_NAME = 'foodmax-ai-config';
 const PLUGIN_NAME = 'foodmax-ai-config';
 const PACKAGE_NAME = 'foodmax-ai-config';
@@ -1768,7 +1768,7 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
   const pkgRoot = opts.packageRootOverride ?? join(opts.cwd, 'node_modules', PACKAGE_NAME);
   if (!existsSync(join(pkgRoot, 'package.json'))) {
     throw new Error(
-      `Installed package not found at ${pkgRoot}. If this is your first init, install first: \`npm install --no-save github:foodmax/ai-config-init\``
+      `Installed package not found at ${pkgRoot}. If this is your first init, install first: \`npm install --no-save https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git\``
     );
   }
 
@@ -1862,7 +1862,7 @@ function writeProjectPackageJson(cwd: string): void {
     console.log(info(`package.json devDependencies["${PACKAGE_NAME}"] already set; leaving it`));
     return;
   }
-  pkg.devDependencies[PACKAGE_NAME] = `github:foodmax/ai-config-init`;
+  pkg.devDependencies[PACKAGE_NAME] = `https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git`;
   writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
   console.log(ok(`Updated package.json devDependencies["${PACKAGE_NAME}"]`));
 }
@@ -2097,11 +2097,11 @@ export async function runVerify(opts: RunVerifyOptions): Promise<VerifyOutcome> 
   const projectLockPath = join(opts.cwd, projectLockfileName());
 
   if (!existsSync(pkgRoot) || !existsSync(join(pkgRoot, 'package.json'))) {
-    console.error(fail(`Package ${PACKAGE_NAME} not installed. Run: npx -y github:foodmax/ai-config-init init`));
+    console.error(fail(`Package ${PACKAGE_NAME} not installed. Run: npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git init`));
     return { ok: false, exitCode: 2, driftedFiles: [] };
   }
   if (!existsSync(projectLockPath)) {
-    console.error(fail(`${projectLockfileName()} not found. Run: npx -y github:foodmax/ai-config-init init`));
+    console.error(fail(`${projectLockfileName()} not found. Run: npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git init`));
     return { ok: false, exitCode: 2, driftedFiles: [] };
   }
   const internalLockPath = join(pkgRoot, packageLockfileName());
@@ -2380,7 +2380,7 @@ git commit -m "feat(status): drift listing with --diff content view"
 - Modify: `src/commands/repair.ts`
 - Test: `tests/repair.test.ts`
 
-The repair command re-fetches the package from git (re-running `npm install --no-save github:foodmax/ai-config-init`) to overwrite local edits. For tests, we inject the install function.
+The repair command re-fetches the package from git (re-running `npm install --no-save https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git`) to overwrite local edits. For tests, we inject the install function.
 
 - [ ] **Step 16.1: Write failing test**
 
@@ -2463,7 +2463,7 @@ import { ok, warn, fail, info } from '../lib/log.js';
 const _exec = promisify(execFile);
 
 const PACKAGE_NAME = 'foodmax-ai-config';
-const SOURCE = 'github:foodmax/ai-config-init';
+const SOURCE = 'https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git';
 
 export interface RunRepairOptions {
   cwd: string;
@@ -2636,7 +2636,7 @@ import { ok, fail, info } from '../lib/log.js';
 const _exec = promisify(execFile);
 
 const PACKAGE_NAME = 'foodmax-ai-config';
-const SOURCE = 'github:foodmax/ai-config-init';
+const SOURCE = 'https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git';
 const MARKETPLACE_NAME = 'foodmax-ai-config';
 const PLUGIN_NAME = 'foodmax-ai-config';
 
@@ -2883,7 +2883,7 @@ if [[ -f ".foodmax-ai.lock.json" ]]; then
   fi
 else
   echo "FoodMax AI config: not yet initialized in this project."
-  echo "  → Run: npx -y github:foodmax/ai-config-init init"
+  echo "  → Run: npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git init"
 fi
 exit 0
 ```
@@ -3027,7 +3027,7 @@ git commit -m "ci: test + typecheck + lockfile-freshness workflow"
 在你的 FoodMax 项目根目录（例如 `~/CodeBuddy/foodmax-backend/`）下跑：
 
 ```bash
-npx -y github:foodmax/ai-config-init init
+npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git init
 ```
 
 它会：
@@ -3105,7 +3105,7 @@ git push --tags
 团队成员通过 commit SHA 或 tag pin：
 
 ```json
-"devDependencies": { "foodmax-ai-config": "github:foodmax/ai-config-init#v0.2.0" }
+"devDependencies": { "foodmax-ai-config": "https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git#v0.2.0" }
 ```
 
 ---

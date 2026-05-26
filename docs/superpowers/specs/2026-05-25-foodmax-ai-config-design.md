@@ -14,7 +14,7 @@
 团队成员通过一行命令落地：
 
 ```bash
-npx -y github:foodmax/ai-config-init init
+npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git init
 ```
 
 工程师本地的 Claude Code 会获得统一的 skills / hooks / CLAUDE.md 团队规则；项目根会落一个小巧的 `CLAUDE.md` + `.foodmax-ai.lock.json`；CI 通过 `npx foodmax-ai verify --strict` 守门，保证 main 分支永远在团队约定的版本上。
@@ -76,7 +76,7 @@ npx -y github:foodmax/ai-config-init init
 ### 5.1 双形态：一个仓库，两种装法
 
 ```
-                  github:foodmax/ai-config-init
+                  https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git
                             │
               ┌─────────────┴─────────────┐
               │                           │
@@ -176,7 +176,7 @@ foodmax-ai-config/
 
 ```
 $ cd ~/my-foodmax-project
-$ npx -y github:foodmax/ai-config-init init
+$ npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git init
 ```
 
 ### Step 0: 环境探测（不写任何文件）
@@ -192,7 +192,7 @@ $ npx -y github:foodmax/ai-config-init init
 | 操作 | 文件 | 行为 |
 |---|---|---|
 | 创建/合并 | `<project>/CLAUDE.md` | 不存在则写入完整模板；存在则在文件头插入 `<!-- BEGIN foodmax-ai -->` … `<!-- END foodmax-ai -->` 区块，其余原样保留 |
-| 修改 | `<project>/package.json` | `devDependencies["foodmax-ai-config"]` = `"github:foodmax/ai-config-init#<commit-sha>"` |
+| 修改 | `<project>/package.json` | `devDependencies["foodmax-ai-config"]` = `"https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git#<commit-sha>"` |
 | 创建/追加 | `<project>/.gitignore` | 确保 `.claude/settings.local.json` 已忽略；幂等检查 |
 | 创建 | `<project>/.github/workflows/ai-config-verify.yml` | 仅当目录不存在或文件缺失时创建；存在则跳过并提示 |
 
@@ -201,7 +201,7 @@ $ npx -y github:foodmax/ai-config-init init
 ### Step 2: 装 Claude plugin（覆盖用户全局 `~/.claude/`）
 
 ```bash
-claude plugin marketplace add github:foodmax/ai-config-init
+claude plugin marketplace add https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git
 claude plugin install foodmax-ai-config@foodmax-ai-config --scope user
 ```
 
@@ -216,7 +216,7 @@ claude plugin install foodmax-ai-config@foodmax-ai-config --scope user
 {
   "version": 1,
   "package": "foodmax-ai-config",
-  "source": "github:foodmax/ai-config-init",
+  "source": "https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git",
   "commitSha": "abc123def456...",
   "packageVersion": "1.3.0",
   "packageRootHash": "9f8e7d6c5b4a...",
@@ -419,7 +419,7 @@ if [[ -f ".foodmax-ai.lock.json" ]]; then
   echo "FoodMax AI config: locked to v${LOCKED_VERSION}"
   # 不阻塞会话：如果想做 drift check 改成 npx foodmax-ai verify
 else
-  echo "⚠ FoodMax AI config not initialized. Run: npx -y github:foodmax/ai-config-init init"
+  echo "⚠ FoodMax AI config not initialized. Run: npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git init"
 fi
 ```
 
@@ -473,7 +473,7 @@ git push --tags
 **关键守则**：
 - `.locked.json` 必须随每个改动 skills/hooks/CLAUDE.md 的 PR 一起更新；CI 里加 `pnpm run lock:check` 拦截
 - 版本号语义：major = breaking（删 skill / 改 CLAUDE.md 强制规则）；minor = 加 skill / 加 hook；patch = 文案修订
-- 团队成员通过 commit SHA 或 tag 指定版本：`devDependencies["foodmax-ai-config"]: "github:foodmax/ai-config-init#v1.4.0"`
+- 团队成员通过 commit SHA 或 tag 指定版本：`devDependencies["foodmax-ai-config"]: "https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git#v1.4.0"`
 
 ---
 
@@ -576,7 +576,7 @@ git push --tags
 ### 第一次设置
 \`\`\`bash
 cd ~/my-foodmax-project
-npx -y github:foodmax/ai-config-init init
+npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git init
 \`\`\`
 
 ### 日常使用

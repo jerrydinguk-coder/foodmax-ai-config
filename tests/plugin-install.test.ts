@@ -9,7 +9,7 @@ test('installPlugin invokes marketplace add then install', async () => {
   };
 
   const r = await installPlugin({
-    source: 'github:foodmax/ai-config-init',
+    source: 'https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git',
     marketplaceName: 'foodmax-ai-config',
     pluginName: 'foodmax-ai-config',
     scope: 'user',
@@ -18,7 +18,7 @@ test('installPlugin invokes marketplace add then install', async () => {
 
   expect(r.ok).toBe(true);
   expect(calls).toHaveLength(2);
-  expect(calls[0]).toEqual(['claude', ['plugin', 'marketplace', 'add', 'github:foodmax/ai-config-init']]);
+  expect(calls[0]).toEqual(['claude', ['plugin', 'marketplace', 'add', 'https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git']]);
   expect(calls[1]).toEqual(['claude', ['plugin', 'install', 'foodmax-ai-config@foodmax-ai-config', '--scope', 'user']]);
 });
 

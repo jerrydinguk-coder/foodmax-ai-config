@@ -1,4 +1,4 @@
-import { readdir } from 'node:fs/promises';
+import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -9,6 +9,12 @@ export interface VersionPackagesDeps {
   listChangesets: () => Promise<string[]>;
   /** Runs `pnpm changeset version` which writes package.json + CHANGELOG.md. */
   runChangesetVersion: () => Promise<void>;
+  /** Reads the current version from package.json after changeset version has run. */
+  readPackageVersion: () => Promise<string>;
+  /** Reads the current .claude-plugin/marketplace.json as a plain object. */
+  readMarketplace: () => Promise<unknown>;
+  /** Writes the updated marketplace.json data back to disk. */
+  writeMarketplace: (data: unknown) => Promise<void>;
   gitAdd: (paths: string[]) => Promise<void>;
   gitCommit: (msg: string) => Promise<void>;
   gitPush: (branch: string) => Promise<void>;
@@ -29,6 +35,17 @@ export const defaultDeps: VersionPackagesDeps = {
   },
   runChangesetVersion: async () => {
     await execFileAsync('pnpm', ['changeset', 'version'], { timeout: 60_000 });
+  },
+  readPackageVersion: async () => {
+    const raw = await readFile('package.json', 'utf8');
+    return (JSON.parse(raw) as { version: string }).version;
+  },
+  readMarketplace: async () => {
+    const raw = await readFile('.claude-plugin/marketplace.json', 'utf8');
+    return JSON.parse(raw) as unknown;
+  },
+  writeMarketplace: async (data) => {
+    await writeFile('.claude-plugin/marketplace.json', JSON.stringify(data, null, 2) + '\n', 'utf8');
   },
   gitAdd: async (paths) => {
     await execFileAsync('git', ['add', ...paths], { timeout: 10_000 });
@@ -51,7 +68,16 @@ export async function runVersionPackages(
   }
   console.log(`Found ${changesets.length} changeset(s); bumping version…`);
   await deps.runChangesetVersion();
-  await deps.gitAdd(['package.json', 'CHANGELOG.md', '.changeset/']);
+
+  // Sync marketplace.json version to match the new package.json version
+  const newVersion = await deps.readPackageVersion();
+  const marketplace = await deps.readMarketplace() as { plugins?: Array<{ version: string }> };
+  if (marketplace.plugins?.[0]) {
+    marketplace.plugins[0].version = newVersion;
+  }
+  await deps.writeMarketplace(marketplace);
+
+  await deps.gitAdd(['package.json', 'CHANGELOG.md', '.changeset/', '.claude-plugin/marketplace.json']);
   await deps.gitCommit('chore(release): version packages [skip ci]');
   await deps.gitPush('main');
   return { didBump: true };

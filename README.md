@@ -37,12 +37,9 @@ npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-t
 ```bash
 # 装指定 release tag
 npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git init --version 1.2.3
-
-# 装 beta channel（尝鲜）
-npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git init --channel beta
 ```
 
-可用 channel 在 [versions.json](versions.json) 里查（`latest`、`beta` 等）。`--version` 和 `--channel` 互斥。两者都不传 = 默认 `latest`。同样的 flag 也适用于 `update` 命令。
+可用 channel 在 [versions.json](versions.json) 里查（目前只有 `latest`）。`--version` 和 `--channel` 互斥。两者都不传 = 默认 `latest`。同样的 flag 也适用于 `update` 命令。
 
 ### `init` installs what?
 
@@ -91,7 +88,6 @@ npx foodmax-ai update
 
 ```bash
 npx foodmax-ai update --version 1.2.3   # 强制装 1.2.3
-npx foodmax-ai update --channel beta    # 切到 beta channel
 ```
 
 如果你装的版本被维护者标记为 deprecated，`update` 会在 stdout 警告并给出建议升级目标（`Fixed in vX.Y.Z`）。
@@ -171,7 +167,7 @@ pnpm release             # tag + push + 更新 versions.json
 "devDependencies": { "foodmax-ai-config": "https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git#v0.2.0" }
 ```
 
-或者用 `npx foodmax-ai update --version 0.2.0` / `--channel beta`（Sprint 1 引入的 flag）。
+或者用 `npx foodmax-ai update --version 0.2.0`（Sprint 1 引入的 flag）。
 
 ### 改了 MCP 注册参数时
 

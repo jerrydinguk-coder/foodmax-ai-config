@@ -9,6 +9,7 @@ function makeDeps(overrides: Partial<VersionPackagesDeps> = {}): {
     gitAdd: string[][];
     gitCommit: string[];
     gitPush: string[];
+    writeMarketplace: unknown[];
   };
 } {
   const calls = {
@@ -17,6 +18,7 @@ function makeDeps(overrides: Partial<VersionPackagesDeps> = {}): {
     gitAdd: [] as string[][],
     gitCommit: [] as string[],
     gitPush: [] as string[],
+    writeMarketplace: [] as unknown[],
   };
   const deps: VersionPackagesDeps = {
     listChangesets: async () => {
@@ -25,6 +27,11 @@ function makeDeps(overrides: Partial<VersionPackagesDeps> = {}): {
     },
     runChangesetVersion: async () => {
       calls.runChangesetVersion++;
+    },
+    readPackageVersion: async () => 'new',
+    readMarketplace: async () => ({ plugins: [{ version: 'old', name: 'foodmax-ai-config' }] }),
+    writeMarketplace: async (data) => {
+      calls.writeMarketplace.push(data);
     },
     gitAdd: async (paths) => {
       calls.gitAdd.push(paths);
@@ -65,4 +72,13 @@ test('runVersionPackages commit message ends with [skip ci] so it does not re-tr
   const { deps, calls } = makeDeps();
   await runVersionPackages(deps);
   expect(calls.gitCommit[0]).toMatch(/\[skip ci\]/);
+});
+
+test('runVersionPackages syncs marketplace.json version from package.json after bump', async () => {
+  const { deps, calls } = makeDeps();
+  await runVersionPackages(deps);
+  expect(calls.writeMarketplace).toHaveLength(1);
+  const written = calls.writeMarketplace[0] as { plugins: Array<{ version: string }> };
+  expect(written.plugins[0]!.version).toBe('new');
+  expect(calls.gitAdd[0]).toContain('.claude-plugin/marketplace.json');
 });
