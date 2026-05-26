@@ -1,10 +1,11 @@
 import { test, expect, beforeEach, afterEach } from 'vitest';
-import { writeFileSync, readFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { runRepair } from '../src/commands/repair.js';
 import { runInit } from '../src/commands/init.js';
 import { makeTempProject, makeFakeInstalledPackage } from './helpers/tempProject.js';
 import { generateLockfile } from '../src/lib/lockfile.js';
+import { projectLockfileName } from '../src/lib/paths.js';
 import type { VersionsJson } from '../src/lib/versions.js';
 
 const fakeVersionsJson: VersionsJson = {
@@ -54,4 +55,50 @@ test('repair restores tampered file by re-installing from source', async () => {
   });
   expect(r.ok).toBe(true);
   expect(readFileSync(join(pkgRoot, 'CLAUDE.md'), 'utf8')).toBe(pristineContent);
+});
+
+test('repair pins reinstall to packageVersion from project lockfile', async () => {
+  // beforeEach ran init; .foodmax-ai.lock.json now records packageVersion='0.1.0'
+  // (the fake installed package version, per makeFakeInstalledPackage).
+  writeFileSync(join(pkgRoot, 'CLAUDE.md'), '# tampered\n');
+
+  const execCalls: Array<{ cmd: string; args: string[] }> = [];
+  const exec = async (cmd: string, args: string[]) => {
+    execCalls.push({ cmd, args });
+    writeFileSync(join(pkgRoot, 'CLAUDE.md'), pristineContent);
+    return { stdout: '', stderr: '' };
+  };
+
+  const r = await runRepair({
+    cwd: project.dir,
+    packageRootOverride: pkgRoot,
+    exec,
+  });
+
+  expect(r.ok).toBe(true);
+  expect(execCalls).toHaveLength(1);
+  const call = execCalls[0]!;
+  expect(call.cmd).toBe('npm');
+  expect(call.args.at(-1)).toMatch(/#v0\.1\.0$/);
+});
+
+test('repair falls back to bare source when project lockfile is missing', async () => {
+  rmSync(join(project.dir, projectLockfileName()));
+  writeFileSync(join(pkgRoot, 'CLAUDE.md'), '# tampered\n');
+
+  const execCalls: Array<{ cmd: string; args: string[] }> = [];
+  const exec = async (cmd: string, args: string[]) => {
+    execCalls.push({ cmd, args });
+    writeFileSync(join(pkgRoot, 'CLAUDE.md'), pristineContent);
+    return { stdout: '', stderr: '' };
+  };
+
+  const r = await runRepair({
+    cwd: project.dir,
+    packageRootOverride: pkgRoot,
+    exec,
+  });
+
+  expect(r.ok).toBe(true);
+  expect(execCalls[0]!.args.at(-1)).not.toContain('#');
 });

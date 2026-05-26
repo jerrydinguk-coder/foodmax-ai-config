@@ -1,44 +1,61 @@
 import type { Command } from 'commander';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { join } from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import {
   readLockfile,
   verifyLockfile,
+  type ProjectLockfile,
 } from '../lib/lockfile.js';
-import { packageLockfileName } from '../lib/paths.js';
+import { packageLockfileName, projectLockfileName } from '../lib/paths.js';
+import { defaultExec, type Exec } from '../lib/plugin-install.js';
 import { ok, warn, fail, info } from '../lib/log.js';
 import {
   FOODMAX_PACKAGE as PACKAGE_NAME,
   FOODMAX_SOURCE as SOURCE,
 } from '../lib/constants.js';
 
-const _exec = promisify(execFile);
-
 export interface RunRepairOptions {
   cwd: string;
   packageRootOverride?: string;
   reinstall?: () => Promise<void>;
+  exec?: Exec;
 }
 
 export interface RepairOutcome {
   ok: boolean;
 }
 
+/**
+ * Build the npm install target for repair. Honors the pinned version recorded
+ * in .foodmax-ai.lock.json so a project pinned to an older release does not
+ * silently drift to main.
+ */
+export function resolveRepairTarget(cwd: string): string {
+  const projectLockPath = join(cwd, projectLockfileName());
+  if (!existsSync(projectLockPath)) return SOURCE;
+  try {
+    const parsed = JSON.parse(readFileSync(projectLockPath, 'utf8')) as Partial<ProjectLockfile>;
+    const v = parsed.packageVersion;
+    if (typeof v === 'string' && v.length > 0) {
+      return `${SOURCE}#v${v}`;
+    }
+  } catch {
+    // unreadable lockfile → fall back to bare source
+  }
+  return SOURCE;
+}
+
 export async function runRepair(opts: RunRepairOptions): Promise<RepairOutcome> {
   const pkgRoot = opts.packageRootOverride ?? join(opts.cwd, 'node_modules', PACKAGE_NAME);
+  const exec = opts.exec ?? defaultExec;
+  const target = resolveRepairTarget(opts.cwd);
   const reinstall =
     opts.reinstall ??
     (async () => {
-      await _exec(
-        'npm',
-        ['install', '--no-save', SOURCE],
-        { cwd: opts.cwd, timeout: 120_000 }
-      );
+      await exec('npm', ['install', '--no-save', target]);
     });
 
-  console.log(info('Re-installing from source to overwrite local edits…'));
+  console.log(info(`Re-installing from ${target} to overwrite local edits…`));
   try {
     await reinstall();
   } catch (err) {
