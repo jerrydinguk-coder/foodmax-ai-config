@@ -6,21 +6,6 @@
 
 ---
 
-## 目录
-
-- [快速开始](#快速开始) · 90% 读者
-- [init 做了什么](#init-做了什么)
-- [日常操作](#日常操作)
-- [Feishu 凭据](#feishu-凭据)
-- [预装 Skill](#预装-skill)
-- [版本安全](#版本安全)
-- [Troubleshooting](#troubleshooting)
-- [给维护者](#给维护者) · 5% 读者
-- [v1 不做的事](#v1-不做的事)
-- [反馈与贡献](#反馈与贡献)
-
----
-
 ## 快速开始
 
 ### 前置条件
@@ -39,7 +24,7 @@
 git ls-remote https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git
 ```
 
-如果这条挂住或报 `ETIMEDOUT`，说明 git auth 没就绪 — 见 [Troubleshooting](#troubleshooting) 第一行。
+如果这条挂住或报 `ETIMEDOUT`，说明 git auth 没就绪 — 见本文末尾 Troubleshooting 章节第一行。
 
 ### 安装（3 步）
 
@@ -60,7 +45,7 @@ npx foodmax-ai update
 
 ### init 跑完后必做 3 件事
 
-1. **导出 Feishu 凭据到 shell rc** — 见 [Feishu 凭据](#feishu-凭据)。
+1. **导出 Feishu 凭据到 shell rc** — 见下方「Feishu 凭据」一节。
 2. **重启 Claude Code** — plugin 和 MCP 是 SessionStart 时加载；env 变了也要重启才能被 MCP 读到。
 3. **commit CI workflow** — `git add .github/workflows/ai-config-verify.yml && git commit`。
 
@@ -80,14 +65,14 @@ npx foodmax-ai update
 
 > CI workflow 钉的是 bootstrapper repo 的 `#main` 分支，**不是**你 init 时的 tag — CI 验证会随 bootstrapper main 漂移。
 
-### B. 注册 foodmax-ai-config plugin 到 Claude Code（带 10 个预装 skill）
+### B. 注册 foodmax-ai-config plugin 到 Claude Code
 
 ```
 claude plugin marketplace add <Codeup URL>#<tag>
 claude plugin install foodmax-ai-config@foodmax-ai-config --scope user
 ```
 
-plugin 注册成功后，10 个预装 skill 立刻可用（用自然语言调用，无需 slash 命令）—— 完整清单见下文 [预装 Skill](#预装-skill) 一节。失败只打 ⚠ 警告，不会中断 init。
+这一步装的就是本仓库 — 它带来下方 § D 列出的 10 个预装 skill。失败只打 ⚠ 警告，不会中断 init。
 
 ### C. 全局 4 项 best-effort 集成
 
@@ -102,7 +87,26 @@ plugin 注册成功后，10 个预装 skill 立刻可用（用自然语言调用
 
 被跳过的 MCP 如果是别人的版本而不是团队版，跑 `npx foodmax-ai update --force-mcp` 强制重装。
 
-### D. init 的 flags
+### D. 自带的 10 个预装 Skill
+
+这 10 个 skill 是 § B 装的 plugin 的一部分，init 完成后立刻可用。用自然语言说就行 —— "把这两个 PDF 合一个"、"读 xlsx 第二个 sheet" —— Claude 会自动选 skill，不用记 slash 命令。
+
+| Skill | 用途 |
+|---|---|
+| `docx` | Word `.docx` 读 / 写 / 编辑 |
+| `pdf` | PDF 合并、拆分、加密、OCR、水印、表单 |
+| `pptx` | PowerPoint 创建、解析、编辑 |
+| `xlsx` | Excel / CSV / TSV 读写 + 数据清洗 |
+| `prd` | 生成 PRD（含 user stories、技术规格、风险）|
+| `frontend-design` | 高质量前端 UI 生成 |
+| `theme-factory` | 给 artifact 套主题样式（10 个预设主题）|
+| `webapp-testing` | Playwright 测试本地 web app + 截图 |
+| `skill-creator` | 创建 / 改 / 评测 skill |
+| `find-skills` | 帮你找一个能解决某问题的 skill |
+
+> **没有 FoodMax-specific slash 命令** — repo 里 `commands/` 和 `agents/` 目录目前都不存在。想加新 skill 见下方「给维护者」一节的「加新 skill」。
+
+### E. init 的 flags
 
 | Flag | 行为 |
 |---|---|
@@ -172,27 +176,6 @@ echo 'export LARK_APP_SECRET=xxxxx' >> ~/.zshrc
 ```
 
 不设也能跑，但每次 Feishu MCP 调用都会 401。
-
----
-
-## 预装 Skill
-
-init 之后下面 10 个 skill 自动可用。用自然语言说就行 — "把这两个 PDF 合一个"、"读 xlsx 第二个 sheet" — Claude 会自动选 skill，不需要记 slash 命令。
-
-| Skill | 用途 |
-|---|---|
-| `docx` | Word `.docx` 读 / 写 / 编辑 |
-| `pdf` | PDF 合并、拆分、加密、OCR、水印、表单 |
-| `pptx` | PowerPoint 创建、解析、编辑 |
-| `xlsx` | Excel / CSV / TSV 读写 + 数据清洗 |
-| `prd` | 生成 PRD（含 user stories、技术规格、风险）|
-| `frontend-design` | 高质量前端 UI 生成 |
-| `theme-factory` | 给 artifact 套主题样式（10 个预设主题）|
-| `webapp-testing` | Playwright 测试本地 web app + 截图 |
-| `skill-creator` | 创建 / 改 / 评测 skill |
-| `find-skills` | 帮你找一个能解决某问题的 skill |
-
-> **没有 FoodMax-specific slash 命令** — repo 里 `commands/` 和 `agents/` 目录目前都不存在。想加 → 见 [加新 skill](#加新-skill)。
 
 ---
 
