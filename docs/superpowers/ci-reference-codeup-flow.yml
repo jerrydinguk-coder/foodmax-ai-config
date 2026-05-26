@@ -1,14 +1,22 @@
-# Codeup Pipelines configuration for foodmax-ai-config-init
+# =============================================================================
+# REFERENCE ONLY — NOT ACTIVE
+# =============================================================================
+# This file is NOT picked up by Codeup. Codeup (代码托管) does not auto-detect
+# repo-level CI files. CI/CD on Codeup requires 云效 Flow (a separate Aliyun
+# product at flow.aliyun.com).
 #
-# IMPORTANT — verification needed on first run:
-# - Codeup Pipelines syntax is close to GitLab CI but may differ in variable
-#   names ($CI_COMMIT_BRANCH, $CI_PIPELINE_SOURCE, $CI_COMMIT_TITLE), image
-#   directives, and `rules:if:` evaluation. If the first push fails, look at
-#   the existing pipeline in another internal Codeup project as reference and
-#   adapt syntax. The job logic itself (what each job does) is correct.
+# Sprint 2 outcome: Codeup CI auto-trigger is deferred. Releases are done
+# MANUALLY by the maintainer running `pnpm version-packages` + `pnpm release`
+# locally. See RELEASING.md for the manual flow.
 #
-# - CI_BOT_TOKEN secret must be configured in Codeup project settings before
-#   version-packages or release jobs can push. See RELEASING.md "前置：CI bot 准备".
+# This file is kept as a reference for when an admin enables Flow for this
+# repo (Sprint 3+). The logic of the three stages (test / version-packages /
+# release) maps directly to Flow jobs; only the YAML schema needs adaptation
+# to whatever Flow expects.
+#
+# Original assumptions (kept here for context):
+# - Syntax mimicked GitLab CI (rules:if, $CI_COMMIT_BRANCH, etc.)
+# - Required CI_BOT_TOKEN secret (managed in Flow secrets, not Codeup)
 
 stages:
   - test
