@@ -5,6 +5,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   readLockfile,
+  type ProjectLockfile,
 } from '../lib/lockfile.js';
 import {
   packageLockfileName,
@@ -20,6 +21,13 @@ import {
   FOODMAX_PLUGIN as PLUGIN_NAME,
   MANAGED_MCP_NAMES,
 } from '../lib/constants.js';
+import {
+  fetchVersions as defaultFetchVersions,
+  resolveVersion,
+  checkDeprecated,
+  type VersionsJson,
+} from '../lib/versions.js';
+import { detectClaudeCli, requireClaudeVersion, type DetectResult } from '../lib/claude-detect.js';
 
 const _exec = promisify(execFile);
 
@@ -34,15 +42,42 @@ export interface RunUpdateOptions {
   larkCliPresent?: () => Promise<boolean>;
   /** Test injection so update does not run real `claude mcp list`. */
   listMcpNames?: () => Promise<string[]>;
+  /** Pin to a specific semver. Mutually exclusive with channel. */
+  version?: string;
+  /** Pick a channel from versions.json (default: latest). Mutually exclusive with version. */
+  channel?: string;
+  /** Inject for tests: avoid network/git. */
+  fetchVersions?: () => Promise<VersionsJson>;
+  /** Inject for tests: avoid shelling out to `claude --version`. */
+  claudeDetect?: () => Promise<DetectResult>;
 }
 
 export async function runUpdate(opts: RunUpdateOptions): Promise<void> {
   const pkgRoot = opts.packageRootOverride ?? join(opts.cwd, 'node_modules', PACKAGE_NAME);
   const exec = opts.exec ?? defaultExec;
+
+  // Peer check + version resolution
+  const detect = opts.claudeDetect ?? (() => detectClaudeCli());
+  const claudeR = await detect();
+
+  const fetchV = opts.fetchVersions ?? (() => defaultFetchVersions());
+  const versionsJson = await fetchV();
+
+  const claudeReq = requireClaudeVersion(claudeR, versionsJson.peerRequirements.claudeCode);
+  if (!claudeReq.ok) throw new Error(claudeReq.reason);
+
+  const resolved = resolveVersion(versionsJson, { version: opts.version, channel: opts.channel });
+  const pinnedSource = `${SOURCE}#${resolved.tag}`;
+
+  const dep = checkDeprecated(versionsJson, resolved.version);
+  if (dep) {
+    console.warn(warn(`⚠️  v${dep.version} is deprecated: ${dep.reason}. Fixed in v${dep.fixedIn}.`));
+  }
+
   const reinstall =
     opts.reinstall ??
     (async () => {
-      await _exec('npm', ['install', '--no-save', SOURCE], { cwd: opts.cwd, timeout: 120_000 });
+      await exec('npm', ['install', '--no-save', pinnedSource]);
     });
 
   console.log(info('Re-fetching latest from source…'));
@@ -54,7 +89,7 @@ export async function runUpdate(opts: RunUpdateOptions): Promise<void> {
   } catch {
     // first-time update may need the install path; do it
     await installPlugin({
-      source: SOURCE,
+      source: pinnedSource,
       marketplaceName: MARKETPLACE_NAME,
       pluginName: PLUGIN_NAME,
       scope: 'user',
@@ -107,17 +142,21 @@ export async function runUpdate(opts: RunUpdateOptions): Promise<void> {
   const projectLockPath = join(opts.cwd, projectLockfileName());
   const existing = (existsSync(projectLockPath)
     ? JSON.parse(readFileSync(projectLockPath, 'utf8'))
-    : {}) as Record<string, unknown>;
-  const next = {
+    : {}) as Partial<ProjectLockfile>;
+  const pkgVersion = readPackageVersion(pkgRoot);
+  const next: ProjectLockfile = {
     ...existing,
     version: 1,
     package: PACKAGE_NAME,
     source: SOURCE,
     commitSha: await tryReadInstalledCommitSha(pkgRoot),
-    packageVersion: readPackageVersion(pkgRoot),
+    packageVersion: pkgVersion,
     packageRootHash: internalLock.rootHash,
-    initializedAt: (existing as { initializedAt?: string }).initializedAt ?? new Date().toISOString(),
+    initializedAt: existing.initializedAt ?? new Date().toISOString(),
+    initializedBy: existing.initializedBy ?? `foodmax-ai@${pkgVersion}`,
     updatedAt: new Date().toISOString(),
+    ...(resolved.source === 'channel' ? { channel: resolved.channel } : { channel: undefined }),
+    resolvedFrom: resolved.source,
   };
   writeFileSync(projectLockPath, JSON.stringify(next, null, 2) + '\n');
   console.log(ok(`Updated. Project pinned to packageRootHash=${internalLock.rootHash.slice(0, 12)}…`));
@@ -142,11 +181,15 @@ export function registerUpdate(program: Command): void {
     .command('update')
     .description('Re-fetch latest, refresh plugin, re-run integrations, rewrite project lockfile')
     .option('--force-mcp', 'Remove and re-register managed MCPs (picks up changed args)')
+    .option('--version <semver>', 'Pin to a specific version (e.g., 1.2.3). Mutually exclusive with --channel')
+    .option('--channel <name>', 'Pick a channel from versions.json (default: latest)')
     .action(async (opts) => {
       try {
         await runUpdate({
           cwd: process.cwd(),
           forceMcp: Boolean(opts.forceMcp),
+          version: opts.version,
+          channel: opts.channel,
         });
       } catch (err) {
         console.error(fail(err instanceof Error ? err.message : String(err)));

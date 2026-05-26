@@ -30,6 +30,8 @@ export interface ProjectLockfile {
   channel?: string;
   /** How the version was selected. Undefined for pre-Sprint-1 lockfiles (backward compat). */
   resolvedFrom?: 'channel' | 'explicit-version';
+  /** When this lockfile was last updated by `update`. Optional for backward compat. */
+  updatedAt?: string;
 }
 
 export interface VerifyResult {

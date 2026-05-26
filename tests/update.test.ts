@@ -23,6 +23,7 @@ let pkgRoot: string;
 // `claude mcp list` in CI.
 const fakeLarkCliPresent = async () => true;
 const fakeListMcpNamesEmpty = async () => [] as string[];
+const fakeClaudeDetect = async () => ({ ok: true as const, version: '1.0.0' });
 
 beforeEach(async () => {
   project = makeTempProject({
@@ -57,6 +58,8 @@ test('update rewrites project lockfile with new packageRootHash', async () => {
     packageRootOverride: pkgRoot,
     exec: async () => ({ stdout: '', stderr: '' }),
     reinstall: async () => {},
+    fetchVersions: fakeFetchVersions,
+    claudeDetect: fakeClaudeDetect,
     larkCliPresent: fakeLarkCliPresent,
     listMcpNames: fakeListMcpNamesEmpty,
   });
@@ -78,6 +81,8 @@ test('update runs integrations so new integrations propagate automatically', asy
       return { stdout: '', stderr: '' };
     },
     reinstall: async () => {},
+    fetchVersions: fakeFetchVersions,
+    claudeDetect: fakeClaudeDetect,
     larkCliPresent: fakeLarkCliPresent,
     listMcpNames: fakeListMcpNamesEmpty,
   });
@@ -112,6 +117,8 @@ test('update without --force-mcp does NOT remove existing MCPs', async () => {
       return { stdout: '', stderr: '' };
     },
     reinstall: async () => {},
+    fetchVersions: fakeFetchVersions,
+    claudeDetect: fakeClaudeDetect,
     larkCliPresent: fakeLarkCliPresent,
     listMcpNames: async () => ['playwright', 'feishu'], // already registered
   });
@@ -136,6 +143,8 @@ test('update --force-mcp removes managed MCPs then re-registers them', async () 
       return { stdout: '', stderr: '' };
     },
     reinstall: async () => {},
+    fetchVersions: fakeFetchVersions,
+    claudeDetect: fakeClaudeDetect,
     larkCliPresent: fakeLarkCliPresent,
     // Simulate post-removal state: a name disappears from the list once removed.
     listMcpNames: async () =>
@@ -183,6 +192,8 @@ test('update --force-mcp tolerates remove failures (MCP may not be registered ye
       return { stdout: '', stderr: '' };
     },
     reinstall: async () => {},
+    fetchVersions: fakeFetchVersions,
+    claudeDetect: fakeClaudeDetect,
     larkCliPresent: fakeLarkCliPresent,
     listMcpNames: fakeListMcpNamesEmpty,
   });
@@ -211,6 +222,8 @@ test('update integration failures do NOT fail the overall update (lockfile still
       return { stdout: '', stderr: '' };
     },
     reinstall: async () => {},
+    fetchVersions: fakeFetchVersions,
+    claudeDetect: fakeClaudeDetect,
     larkCliPresent: fakeLarkCliPresent,
     listMcpNames: fakeListMcpNamesEmpty,
   });
@@ -218,4 +231,143 @@ test('update integration failures do NOT fail the overall update (lockfile still
     readFileSync(join(project.dir, '.foodmax-ai.lock.json'), 'utf8')
   );
   expect(projectLock.updatedAt).toBeTruthy();
+});
+
+// ---- Task 9: --version / --channel / deprecation warn / peer-check ----
+
+const updateFakeVersions: VersionsJson = {
+  schemaVersion: 1,
+  channels: {
+    latest: { version: '1.2.3', tag: 'v1.2.3', publishedAt: '2026-05-26T00:00:00Z' },
+    beta: { version: '1.3.0-rc.1', tag: 'v1.3.0-rc.1', publishedAt: '2026-05-25T00:00:00Z' },
+  },
+  deprecated: [
+    { version: '1.1.0', reason: 'critical bug', fixedIn: '1.1.1', deprecatedAt: '2026-05-10T00:00:00Z' },
+  ],
+  minSupportedVersion: '1.0.0',
+  peerRequirements: { claudeCode: '>=1.0.0', node: '>=18.0.0' },
+};
+
+const updateFakeFetchVersions = async () => updateFakeVersions;
+
+/** Common options for the new tests so we don't shell out for real */
+const sharedUpdateOpts = {
+  reinstall: async () => {},
+  larkCliPresent: fakeLarkCliPresent,
+  listMcpNames: fakeListMcpNamesEmpty,
+  claudeDetect: async () => ({ ok: true as const, version: '1.0.0' }),
+};
+
+test('update --version 1.2.3 reinstalls with that pinned tag', async () => {
+  const execCalls: Array<[string, string[]]> = [];
+  await runUpdate({
+    cwd: project.dir,
+    packageRootOverride: pkgRoot,
+    ...sharedUpdateOpts,
+    fetchVersions: updateFakeFetchVersions,
+    version: '1.2.3',
+    exec: async (cmd, args) => {
+      execCalls.push([cmd, args]);
+      return { stdout: '', stderr: '' };
+    },
+    // Do not inject reinstall so default reinstall path runs via exec
+    reinstall: undefined,
+  });
+  const npmInstall = execCalls.find(([cmd, args]) => cmd === 'npm' && args[0] === 'install');
+  expect(npmInstall).toBeDefined();
+  expect(npmInstall![1].join(' ')).toContain('#v1.2.3');
+});
+
+test('update --channel beta reinstalls with beta tag', async () => {
+  const execCalls: Array<[string, string[]]> = [];
+  await runUpdate({
+    cwd: project.dir,
+    packageRootOverride: pkgRoot,
+    ...sharedUpdateOpts,
+    fetchVersions: updateFakeFetchVersions,
+    channel: 'beta',
+    exec: async (cmd, args) => {
+      execCalls.push([cmd, args]);
+      return { stdout: '', stderr: '' };
+    },
+    reinstall: undefined,
+  });
+  const npmInstall = execCalls.find(([cmd, args]) => cmd === 'npm' && args[0] === 'install');
+  expect(npmInstall).toBeDefined();
+  expect(npmInstall![1].join(' ')).toContain('#v1.3.0-rc.1');
+});
+
+test('update default (no flags) uses latest channel', async () => {
+  const execCalls: Array<[string, string[]]> = [];
+  await runUpdate({
+    cwd: project.dir,
+    packageRootOverride: pkgRoot,
+    ...sharedUpdateOpts,
+    fetchVersions: updateFakeFetchVersions,
+    exec: async (cmd, args) => {
+      execCalls.push([cmd, args]);
+      return { stdout: '', stderr: '' };
+    },
+    reinstall: undefined,
+  });
+  const npmInstall = execCalls.find(([cmd, args]) => cmd === 'npm' && args[0] === 'install');
+  expect(npmInstall).toBeDefined();
+  expect(npmInstall![1].join(' ')).toContain('#v1.2.3');
+});
+
+test('update warns when installing a deprecated version', async () => {
+  const logs: string[] = [];
+  const origWarn = console.warn;
+  console.warn = (msg: string) => { logs.push(String(msg)); };
+  try {
+    await runUpdate({
+      cwd: project.dir,
+      packageRootOverride: pkgRoot,
+      ...sharedUpdateOpts,
+      fetchVersions: updateFakeFetchVersions,
+      version: '1.1.0',
+    });
+  } finally {
+    console.warn = origWarn;
+  }
+  expect(logs.some((l) => /deprecated/i.test(l))).toBe(true);
+  expect(logs.some((l) => /1\.1\.1/.test(l))).toBe(true);
+});
+
+test('update records channel + resolvedFrom in lockfile on channel switch', async () => {
+  await runUpdate({
+    cwd: project.dir,
+    packageRootOverride: pkgRoot,
+    ...sharedUpdateOpts,
+    fetchVersions: updateFakeFetchVersions,
+    channel: 'beta',
+  });
+  const lock = JSON.parse(readFileSync(join(project.dir, '.foodmax-ai.lock.json'), 'utf8'));
+  expect(lock.channel).toBe('beta');
+  expect(lock.resolvedFrom).toBe('channel');
+});
+
+test('update --version + --channel errors with mutually exclusive message', async () => {
+  await expect(
+    runUpdate({
+      cwd: project.dir,
+      packageRootOverride: pkgRoot,
+      ...sharedUpdateOpts,
+      fetchVersions: updateFakeFetchVersions,
+      version: '1.2.3',
+      channel: 'beta',
+    })
+  ).rejects.toThrow(/mutually exclusive/i);
+});
+
+test('update blocks when Claude Code version is below peerRequirements', async () => {
+  await expect(
+    runUpdate({
+      cwd: project.dir,
+      packageRootOverride: pkgRoot,
+      ...sharedUpdateOpts,
+      fetchVersions: updateFakeFetchVersions,
+      claudeDetect: async () => ({ ok: true as const, version: '0.5.0' }),
+    })
+  ).rejects.toThrow(/Claude Code 0\.5\.0/);
 });
