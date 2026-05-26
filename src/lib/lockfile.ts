@@ -12,6 +12,26 @@ export interface Lockfile {
   rootHash: string;
 }
 
+/**
+ * The lockfile written into a consumer project (.foodmax-ai.lock.json).
+ * Distinct from the package-internal {@link Lockfile} (.locked.json):
+ * this records what's pinned, not what the package contents are.
+ */
+export interface ProjectLockfile {
+  version: 1;
+  package: string;
+  source: string;
+  commitSha: string | null;
+  packageVersion: string;
+  packageRootHash: string;
+  initializedAt: string;
+  initializedBy: string;
+  /** Channel the version was resolved from, undefined when --version was explicit. */
+  channel?: string;
+  /** How the version was selected. Undefined for pre-Sprint-1 lockfiles (backward compat). */
+  resolvedFrom?: 'channel' | 'explicit-version';
+}
+
 export interface VerifyResult {
   ok: boolean;
   modified: string[];

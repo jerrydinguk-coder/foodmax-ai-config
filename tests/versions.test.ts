@@ -65,7 +65,7 @@ test('fetchVersions uses raw URL first, returns parsed JSON', async () => {
     shallowCloneVersionsJson: async () => { throw new Error('should not fallback'); },
   };
   const r = await fetchVersions(deps);
-  expect(r.channels.latest.version).toBe('1.2.3');
+  expect(r.channels.latest?.version).toBe('1.2.3');
 });
 
 test('fetchVersions falls back to shallow clone when raw URL fails', async () => {
@@ -74,7 +74,7 @@ test('fetchVersions falls back to shallow clone when raw URL fails', async () =>
     shallowCloneVersionsJson: async () => JSON.stringify(fakeVersions),
   };
   const r = await fetchVersions(deps);
-  expect(r.channels.latest.version).toBe('1.2.3');
+  expect(r.channels.latest?.version).toBe('1.2.3');
 });
 
 test('fetchVersions throws when both raw URL and shallow clone fail', async () => {
