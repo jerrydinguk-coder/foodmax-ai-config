@@ -1,0 +1,84 @@
+# Codeup Pipelines configuration for foodmax-ai-config-init
+#
+# IMPORTANT — verification needed on first run:
+# - Codeup Pipelines syntax is close to GitLab CI but may differ in variable
+#   names ($CI_COMMIT_BRANCH, $CI_PIPELINE_SOURCE, $CI_COMMIT_TITLE), image
+#   directives, and `rules:if:` evaluation. If the first push fails, look at
+#   the existing pipeline in another internal Codeup project as reference and
+#   adapt syntax. The job logic itself (what each job does) is correct.
+#
+# - CI_BOT_TOKEN secret must be configured in Codeup project settings before
+#   version-packages or release jobs can push. See RELEASING.md "前置：CI bot 准备".
+
+stages:
+  - test
+  - version-packages
+  - release
+
+variables:
+  PNPM_VERSION: '9'
+  NODE_VERSION: '20'
+
+# ---------------------------------------------------------------------------
+# Stage 1: test — runs on every PR and every push to main
+# ---------------------------------------------------------------------------
+test:
+  stage: test
+  image: node:20
+  before_script:
+    - npm install -g pnpm@$PNPM_VERSION
+    - pnpm install --frozen-lockfile
+  script:
+    - pnpm typecheck
+    - pnpm test
+    - pnpm build
+    # Lockfile drift guard — fail if .locked.json out of date
+    - pnpm lock
+    - |
+      if ! git diff --exit-code .locked.json; then
+        echo "::error::.locked.json is out of date. Run \`pnpm lock\` locally and commit."
+        exit 1
+      fi
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# ---------------------------------------------------------------------------
+# Stage 2: version-packages
+# Runs when main has new commits with changesets. Accumulates them into a
+# version bump + CHANGELOG write, commits with [skip ci] and pushes back.
+# Skipped when last commit was already a [skip ci] commit (avoids recursion).
+# ---------------------------------------------------------------------------
+version-packages:
+  stage: version-packages
+  image: node:20
+  before_script:
+    - npm install -g pnpm@$PNPM_VERSION
+    - pnpm install --frozen-lockfile
+    - git config user.email "${CI_BOT_EMAIL:-ci-bot@foodmax.local}"
+    - git config user.name "${CI_BOT_NAME:-FoodMax CI Bot}"
+    # Rewrite origin to use the bot token for push access.
+    - git remote set-url origin "https://oauth2:${CI_BOT_TOKEN}@bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git"
+  script:
+    - pnpm version-packages
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_TITLE !~ /\[skip ci\]/'
+
+# ---------------------------------------------------------------------------
+# Stage 3: release
+# Runs when main has a "chore(release): version packages" commit. Tags,
+# pushes the tag, updates versions.json, commits + pushes versions.json.
+# ---------------------------------------------------------------------------
+release:
+  stage: release
+  image: node:20
+  before_script:
+    - npm install -g pnpm@$PNPM_VERSION
+    - pnpm install --frozen-lockfile
+    - git config user.email "${CI_BOT_EMAIL:-ci-bot@foodmax.local}"
+    - git config user.name "${CI_BOT_NAME:-FoodMax CI Bot}"
+    - git remote set-url origin "https://oauth2:${CI_BOT_TOKEN}@bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git"
+  script:
+    - pnpm release
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_TITLE =~ /^chore\(release\): version packages/'
