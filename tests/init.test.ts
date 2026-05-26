@@ -3,6 +3,7 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { runInit } from '../src/commands/init.js';
 import { makeTempProject, makeFakeInstalledPackage } from './helpers/tempProject.js';
+import type { VersionsJson } from '../src/lib/versions.js';
 
 let project: ReturnType<typeof makeTempProject>;
 let pkgRoot: string;
@@ -30,11 +31,25 @@ const fakeClaudeDetect = async () => ({ ok: true as const, version: '1.0.0' });
 const fakeLarkCliPresent = async () => true;
 const fakeListMcpNames = async () => [] as string[];
 
+const fakeVersionsJson: VersionsJson = {
+  schemaVersion: 1,
+  channels: {
+    latest: { version: '1.2.3', tag: 'v1.2.3', publishedAt: '2026-05-26T00:00:00Z' },
+    beta: { version: '1.3.0-rc.1', tag: 'v1.3.0-rc.1', publishedAt: '2026-05-25T00:00:00Z' },
+  },
+  deprecated: [],
+  minSupportedVersion: '1.0.0',
+  peerRequirements: { claudeCode: '>=1.0.0', node: '>=18.0.0' },
+};
+
+const fakeFetchVersions = async () => fakeVersionsJson;
+
 const baseRunInit = {
   exec: fakeExec,
   claudeDetect: fakeClaudeDetect,
   larkCliPresent: fakeLarkCliPresent,
   listMcpNames: fakeListMcpNames,
+  fetchVersions: fakeFetchVersions,
   yes: true as const,
 };
 
@@ -57,6 +72,7 @@ test('init adds foodmax-ai-config to package.json devDependencies', async () => 
   });
   const pkg = JSON.parse(readFileSync(join(project.dir, 'package.json'), 'utf8'));
   expect(pkg.devDependencies['foodmax-ai-config']).toContain('foodmax-ai-config-init.git');
+  expect(pkg.devDependencies['foodmax-ai-config']).toContain('#v1.2.3');
 });
 
 test('init writes .gitignore with settings.local.json', async () => {
@@ -96,15 +112,12 @@ test('init invokes plugin install', async () => {
     ...baseRunInit,
   });
   expect(execCalls.length).toBeGreaterThanOrEqual(2);
-  expect(execCalls[0]).toEqual([
-    'claude',
-    [
-      'plugin',
-      'marketplace',
-      'add',
-      'https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git',
-    ],
-  ]);
+  const marketplaceCall = execCalls.find(
+    ([cmd, args]) => cmd === 'claude' && args[0] === 'plugin' && args[1] === 'marketplace' && args[2] === 'add'
+  );
+  expect(marketplaceCall).toBeDefined();
+  expect(marketplaceCall![1][3]).toContain('foodmax-ai-config-init.git');
+  expect(marketplaceCall![1][3]).toContain('#v1.2.3');
 });
 
 test('init invokes superpowers install + MCP registrations after foodmax plugin', async () => {
@@ -168,4 +181,100 @@ test('init fails when claude CLI not detected', async () => {
       yes: true,
     })
   ).rejects.toThrow(/claude CLI/i);
+});
+
+test('init --version 1.2.3 pins claude plugin marketplace to that tag', async () => {
+  await runInit({
+    cwd: project.dir,
+    packageRootOverride: pkgRoot,
+    ...baseRunInit,
+    version: '1.2.3',
+  });
+  const marketplaceCall = execCalls.find(
+    ([cmd, args]) => cmd === 'claude' && args[0] === 'plugin' && args[1] === 'marketplace' && args[2] === 'add'
+  );
+  expect(marketplaceCall![1][3]).toContain('#v1.2.3');
+});
+
+test('init --channel beta pins to beta tag', async () => {
+  await runInit({
+    cwd: project.dir,
+    packageRootOverride: pkgRoot,
+    ...baseRunInit,
+    channel: 'beta',
+  });
+  const marketplaceCall = execCalls.find(
+    ([cmd, args]) => cmd === 'claude' && args[0] === 'plugin' && args[1] === 'marketplace' && args[2] === 'add'
+  );
+  expect(marketplaceCall![1][3]).toContain('#v1.3.0-rc.1');
+});
+
+test('init default resolves latest channel', async () => {
+  await runInit({
+    cwd: project.dir,
+    packageRootOverride: pkgRoot,
+    ...baseRunInit,
+  });
+  const marketplaceCall = execCalls.find(
+    ([cmd, args]) => cmd === 'claude' && args[0] === 'plugin' && args[1] === 'marketplace' && args[2] === 'add'
+  );
+  expect(marketplaceCall![1][3]).toContain('#v1.2.3');
+});
+
+test('init writes pinned URL to package.json devDependencies', async () => {
+  await runInit({
+    cwd: project.dir,
+    packageRootOverride: pkgRoot,
+    ...baseRunInit,
+    version: '1.2.3',
+  });
+  const pkg = JSON.parse(readFileSync(join(project.dir, 'package.json'), 'utf8'));
+  expect(pkg.devDependencies['foodmax-ai-config']).toContain('#v1.2.3');
+});
+
+test('init records channel + resolvedFrom in project lockfile', async () => {
+  await runInit({
+    cwd: project.dir,
+    packageRootOverride: pkgRoot,
+    ...baseRunInit,
+    channel: 'beta',
+  });
+  const lock = JSON.parse(readFileSync(join(project.dir, '.foodmax-ai.lock.json'), 'utf8'));
+  expect(lock.channel).toBe('beta');
+  expect(lock.resolvedFrom).toBe('channel');
+});
+
+test('init records resolvedFrom=explicit-version (no channel) when --version given', async () => {
+  await runInit({
+    cwd: project.dir,
+    packageRootOverride: pkgRoot,
+    ...baseRunInit,
+    version: '1.2.3',
+  });
+  const lock = JSON.parse(readFileSync(join(project.dir, '.foodmax-ai.lock.json'), 'utf8'));
+  expect(lock.resolvedFrom).toBe('explicit-version');
+  expect(lock.channel).toBeUndefined();
+});
+
+test('init --version + --channel errors', async () => {
+  await expect(
+    runInit({
+      cwd: project.dir,
+      packageRootOverride: pkgRoot,
+      ...baseRunInit,
+      version: '1.2.3',
+      channel: 'beta',
+    })
+  ).rejects.toThrow(/mutually exclusive/i);
+});
+
+test('init blocks when Claude Code version is below peerRequirements', async () => {
+  await expect(
+    runInit({
+      cwd: project.dir,
+      packageRootOverride: pkgRoot,
+      ...baseRunInit,
+      claudeDetect: async () => ({ ok: true as const, version: '0.5.0' }),
+    })
+  ).rejects.toThrow(/Claude Code 0\.5\.0.*>=1\.0\.0/);
 });

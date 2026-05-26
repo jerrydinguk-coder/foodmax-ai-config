@@ -3,9 +3,9 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readLockfile } from '../lib/lockfile.js';
+import { readLockfile, type ProjectLockfile } from '../lib/lockfile.js';
 import { packageLockfileName, projectLockfileName } from '../lib/paths.js';
-import { detectClaudeCli, type DetectResult } from '../lib/claude-detect.js';
+import { detectClaudeCli, requireClaudeVersion, type DetectResult } from '../lib/claude-detect.js';
 import { installPlugin, defaultExec, type Exec } from '../lib/plugin-install.js';
 import { runAllIntegrations } from '../lib/integrations.js';
 import { mergeClaudeMd, mergeGitignore } from '../lib/merge.js';
@@ -18,6 +18,11 @@ import {
   FOODMAX_MARKETPLACE as MARKETPLACE_NAME,
   FOODMAX_PLUGIN as PLUGIN_NAME,
 } from '../lib/constants.js';
+import {
+  fetchVersions as defaultFetchVersions,
+  resolveVersion,
+  type VersionsJson,
+} from '../lib/versions.js';
 
 const _exec = promisify(execFile);
 
@@ -33,6 +38,12 @@ export interface RunInitOptions {
   larkCliPresent?: () => Promise<boolean>;
   /** Inject for tests so init does not run real `claude mcp list`. */
   listMcpNames?: () => Promise<string[]>;
+  /** Pin to a specific semver. Mutually exclusive with channel. */
+  version?: string;
+  /** Pick a channel from versions.json (default: latest). Mutually exclusive with version. */
+  channel?: string;
+  /** Inject for tests: avoid network/git. */
+  fetchVersions?: () => Promise<VersionsJson>;
 }
 
 export async function runInit(opts: RunInitOptions): Promise<void> {
@@ -55,6 +66,18 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
   if (nodeMajor < 18) {
     throw new Error(`Node 18+ required (you have ${process.versions.node})`);
   }
+
+  // Fetch versions metadata + check peer requirements + resolve target tag
+  const fetchV = opts.fetchVersions ?? (() => defaultFetchVersions());
+  const versionsJson = await fetchV();
+
+  const claudeReq = requireClaudeVersion(claudeR, versionsJson.peerRequirements.claudeCode);
+  if (!claudeReq.ok) {
+    throw new Error(claudeReq.reason);
+  }
+
+  const resolved = resolveVersion(versionsJson, { version: opts.version, channel: opts.channel });
+  const pinnedSource = `${SOURCE}#${resolved.tag}`;
 
   const pkgRoot = opts.packageRootOverride ?? join(opts.cwd, 'node_modules', PACKAGE_NAME);
   if (!existsSync(join(pkgRoot, 'package.json'))) {
@@ -84,13 +107,13 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
 
   // Step 1: project files
   writeProjectClaudeMd(opts.cwd);
-  writeProjectPackageJson(opts.cwd);
+  writeProjectPackageJson(opts.cwd, pinnedSource);
   writeProjectGitignore(opts.cwd);
   writeProjectCiWorkflow(opts.cwd);
 
   // Step 2: plugin install (the critical one)
   const installR = await installPlugin({
-    source: SOURCE,
+    source: pinnedSource,
     marketplaceName: MARKETPLACE_NAME,
     pluginName: PLUGIN_NAME,
     scope: 'user',
@@ -125,8 +148,8 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
   // Step 3: project lockfile
   const commitSha = await tryReadInstalledCommitSha(pkgRoot);
   const pkgVersion = readPackageVersion(pkgRoot);
-  const projectLock = {
-    version: 1 as const,
+  const projectLock: ProjectLockfile = {
+    version: 1,
     package: PACKAGE_NAME,
     source: SOURCE,
     commitSha,
@@ -134,6 +157,8 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
     packageRootHash: internalLock.rootHash,
     initializedAt: new Date().toISOString(),
     initializedBy: `foodmax-ai@${pkgVersion}`,
+    ...(resolved.source === 'channel' ? { channel: resolved.channel } : {}),
+    resolvedFrom: resolved.source,
   };
   writeFileSync(
     join(opts.cwd, projectLockfileName()),
@@ -163,7 +188,7 @@ function writeProjectClaudeMd(cwd: string): void {
   console.log(ok(`Wrote ${path} (team region merged)`));
 }
 
-function writeProjectPackageJson(cwd: string): void {
+function writeProjectPackageJson(cwd: string, depUrl: string): void {
   const path = join(cwd, 'package.json');
   if (!existsSync(path)) {
     console.log(warn(`No package.json at ${path}; skipping devDep insert.`));
@@ -175,7 +200,7 @@ function writeProjectPackageJson(cwd: string): void {
     console.log(info(`package.json devDependencies["${PACKAGE_NAME}"] already set; leaving it`));
     return;
   }
-  pkg.devDependencies[PACKAGE_NAME] = SOURCE;
+  pkg.devDependencies[PACKAGE_NAME] = depUrl;
   writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
   console.log(ok(`Updated package.json devDependencies["${PACKAGE_NAME}"]`));
 }
@@ -221,12 +246,16 @@ export function registerInit(program: Command): void {
     .description('Bootstrap this project with foodmax-ai-config')
     .option('--dry-run', 'Print what would happen, do not write')
     .option('--yes', 'Skip interactive confirmations')
+    .option('--version <semver>', 'Pin to a specific version (e.g., 1.2.3). Mutually exclusive with --channel')
+    .option('--channel <name>', 'Pick a channel from versions.json (default: latest)')
     .action(async (opts) => {
       try {
         await runInit({
           cwd: process.cwd(),
           yes: opts.yes,
           dryRun: opts.dryRun,
+          version: opts.version,
+          channel: opts.channel,
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

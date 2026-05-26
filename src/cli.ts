@@ -21,7 +21,7 @@ const program = new Command();
 program
   .name('foodmax-ai')
   .description('FoodMax team-wide AI configuration manager')
-  .version(readPackageVersion());
+  .version(readPackageVersion(), '-V, --pkg-version');
 
 registerInit(program);
 registerVerify(program);
