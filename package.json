@@ -22,7 +22,10 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lock": "tsx src/cli.ts lock",
-    "prepare": "tsup"
+    "prepare": "tsup && husky",
+    "changeset": "changeset",
+    "version-packages": "tsx src/scripts/version-packages.ts",
+    "release": "tsx src/scripts/release.ts"
   },
   "engines": {
     "node": ">=18"
