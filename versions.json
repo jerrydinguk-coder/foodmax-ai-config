@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "channels": {
     "latest": {
-      "version": "0.2.0",
-      "tag": "v0.2.0",
-      "publishedAt": "2026-05-26T08:55:29.589Z"
+      "version": "0.2.1",
+      "tag": "v0.2.1",
+      "publishedAt": "2026-05-26T09:46:07.406Z"
     }
   },
   "deprecated": [],
