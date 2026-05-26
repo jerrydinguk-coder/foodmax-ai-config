@@ -11,7 +11,7 @@
 - [快速开始](#快速开始) · 90% 读者
 - [日常操作](#日常操作)
 - [Feishu 凭据](#feishu-凭据)
-- [团队 Skill](#团队-skill)
+- [预装 Skill](#预装-skill)
 - [安全 & deprecation](#安全--deprecation)
 - [Troubleshooting](#troubleshooting)
 - [给维护者](#给维护者) · 5% 读者
@@ -122,12 +122,36 @@ echo 'export LARK_APP_SECRET=xxxxx' >> ~/.zshrc
 
 ---
 
-## 团队 Skill
+## 预装 Skill
 
-| Slash 命令 | 用途 |
+`init` 后这些 skill 自动可用（来自社区生态，团队公用一份）。**用自然语言直接说就行** —— "帮我把这两个 PDF 合一个"、"读 xlsx 第 2 sheet 的数据"等等，Claude 会自动选择匹配的 skill，不需要记 slash 命令。
+
+**文档处理**
+
+| Skill | 用途 |
 |---|---|
-| `/foodmax-pr-description` | 生成符合团队规范的 PR 描述 |
-| `/foodmax-new-module` | 创建新模块脚手架 |
+| `docx` | Word `.docx` 读 / 写 / 编辑（表格、目录、页眉等） |
+| `pdf` | PDF 合并 / 拆分 / 水印 / 表单 / 加密 / OCR |
+| `pptx` | PowerPoint 演示文稿创建 + 解析 + 编辑 |
+| `xlsx` | Excel / CSV / TSV 读写 + 数据清洗 |
+| `prd` | 生成结构化 PRD（含 user stories、技术规格、风险分析） |
+
+**构建 / 设计**
+
+| Skill | 用途 |
+|---|---|
+| `frontend-design` | 高质量前端 UI 生成，避开 generic AI 美学 |
+| `theme-factory` | 给 artifact 套主题样式（10 个预设主题或现场生成） |
+| `webapp-testing` | 用 Playwright 测试本地 web 应用、抓截图、读 console log |
+
+**Meta**
+
+| Skill | 用途 |
+|---|---|
+| `skill-creator` | 创建 / 改 / 评测 skill |
+| `find-skills` | 帮你找一个能解决某问题的 skill |
+
+> **没有 FoodMax team-specific slash 命令**（PR 模板、新模块脚手架等团队自定义 skill 还没人写）。想加 → 见 [给维护者 § 加新 skill](#给维护者)。
 
 ---
 
