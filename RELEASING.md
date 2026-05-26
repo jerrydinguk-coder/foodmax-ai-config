@@ -15,7 +15,7 @@
 
 ```bash
 git checkout main && git pull
-pnpm test && pnpm typecheck      # 自检
+pnpm pre-release                 # 全套自检：typecheck + test + build + lockfile + pnpm audit + working tree
 pnpm version-packages            # 累积所有 .changeset/*.md，bump + 写 CHANGELOG，commit [skip ci]，push 到 main
 pnpm release                     # 调用 src/scripts/release.ts：tag vX.Y.Z + push tag + update versions.json + commit + push
 ```
@@ -42,6 +42,26 @@ release job: git tag + push tag + update versions.json + commit + push
 2. 把 [ci-reference-codeup-flow.yml](docs/superpowers/ci-reference-codeup-flow.yml) 的三个 stage（test / version-packages / release）逻辑映射到 Flow 配置
 3. 在 Flow secrets 配置 `CI_BOT_TOKEN`（服务账号 token）
 4. 接入完成后回头删本节"未来"二字，把"当前手动"section 标记为 fallback
+
+## 漏洞响应
+
+发现 / 收到漏洞报告 → 参考 [SECURITY.md](SECURITY.md) 的 SLA 表。修复版本 release 时**必须**在 `versions.json["deprecated"]` 把所有受影响的旧版本标记为 `severity: "block"`，例如：
+
+```json
+{
+  "deprecated": [
+    {
+      "version": "1.4.2",
+      "reason": "(预留) 详情见 SECURITY.md 披露",
+      "fixedIn": "1.4.3",
+      "deprecatedAt": "2026-06-01T00:00:00Z",
+      "severity": "block"
+    }
+  ]
+}
+```
+
+`severity: "block"` 会让同事 `init` / `update` 这个版本时硬拦（"v1.4.2 is BLOCKED: ...; You must upgrade to v1.4.3 or later"）。
 
 ## MCP 注册参数变更的特殊情况
 
