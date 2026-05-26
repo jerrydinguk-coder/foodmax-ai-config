@@ -6,8 +6,10 @@ import {
   SUPERPOWERS_MARKETPLACE,
   SUPERPOWERS_PLUGIN,
   PLAYWRIGHT_MCP_NAME,
+  PLAYWRIGHT_MCP_PKG,
   PLAYWRIGHT_MCP_CMD,
   FEISHU_MCP_NAME,
+  FEISHU_MCP_PKG,
   FEISHU_MCP_SHELL_CMD,
   LARK_CLI_BIN,
   LARK_CLI_PKG,
@@ -112,6 +114,12 @@ export async function registerPlaywrightMcp(
   const exec = opts.exec ?? defaultExec;
   const listNames = opts.listMcpNames ?? (() => defaultListMcpNames(exec));
   try {
+    // Eagerly install the pinned package globally — runs regardless of
+    // registration state so the package is materialized on disk by the time
+    // Claude spawns the MCP. Without this, the registered `npx -y <pkg>@<v>`
+    // command would download on first MCP use (slow + fails when offline).
+    await exec('npm', ['install', '-g', PLAYWRIGHT_MCP_PKG]);
+
     const existing = await listNames();
     if (existing.includes(PLAYWRIGHT_MCP_NAME)) {
       return {
@@ -146,6 +154,10 @@ export async function registerFeishuMcp(
   const exec = opts.exec ?? defaultExec;
   const listNames = opts.listMcpNames ?? (() => defaultListMcpNames(exec));
   try {
+    // See registerPlaywrightMcp for the rationale — eager install so the
+    // package is on disk by the time Claude spawns the MCP.
+    await exec('npm', ['install', '-g', FEISHU_MCP_PKG]);
+
     const existing = await listNames();
     if (existing.includes(FEISHU_MCP_NAME)) {
       return {

@@ -56,7 +56,7 @@ test('installSuperpowers: exec throws → failed (does not raise)', async () => 
   expect(r.reason).toContain('boom');
 });
 
-test('registerPlaywrightMcp: registers when absent', async () => {
+test('registerPlaywrightMcp: registers when absent (eager-installs pkg first, then claude mcp add)', async () => {
   const calls: Array<[string, string[]]> = [];
   const exec: Exec = async (cmd, args) => {
     calls.push([cmd, args]);
@@ -67,25 +67,29 @@ test('registerPlaywrightMcp: registers when absent', async () => {
     listMcpNames: async () => ['chrome-devtools'],
   });
   expect(r.status).toBe('installed');
-  expect(calls).toHaveLength(1);
-  const [cmd, args] = calls[0]!;
-  expect(cmd).toBe('claude');
-  // Match args.slice(0, 8) exactly; final arg (package@version) checked by regex
-  // so a version bump doesn't churn this assertion.
-  expect(args.slice(0, 8)).toEqual([
-    'mcp',
-    'add',
-    'playwright',
-    '--scope',
-    'user',
-    '--',
-    'npx',
-    '-y',
+  expect(calls).toHaveLength(2);
+
+  // 1. npm install -g @playwright/mcp@<pinned> — runs FIRST so the package is
+  //    materialized on disk before Claude spawns the MCP for the first time.
+  const [installCmd, installArgs] = calls[0]!;
+  expect(installCmd).toBe('npm');
+  expect(installArgs[0]).toBe('install');
+  expect(installArgs[1]).toBe('-g');
+  expect(installArgs[2]).toMatch(/^@playwright\/mcp@\d+\.\d+\.\d+$/);
+
+  // 2. claude mcp add ... (regex-based version match so bumps don't churn)
+  const [addCmd, addArgs] = calls[1]!;
+  expect(addCmd).toBe('claude');
+  expect(addArgs.slice(0, 8)).toEqual([
+    'mcp', 'add', 'playwright', '--scope', 'user', '--', 'npx', '-y',
   ]);
-  expect(args[8]).toMatch(/^@playwright\/mcp@\d+\.\d+\.\d+$/);
+  expect(addArgs[8]).toMatch(/^@playwright\/mcp@\d+\.\d+\.\d+$/);
 });
 
-test('registerPlaywrightMcp: skips when already registered', async () => {
+test('registerPlaywrightMcp: still eager-installs pkg even when MCP already registered', async () => {
+  // The point of eager install is to materialize the package on disk regardless
+  // of Claude's registration state — so a re-run guarantees the pinned version
+  // is available even if a previous init was interrupted after registration.
   const calls: Array<[string, string[]]> = [];
   const exec: Exec = async (cmd, args) => {
     calls.push([cmd, args]);
@@ -96,7 +100,9 @@ test('registerPlaywrightMcp: skips when already registered', async () => {
     listMcpNames: async () => ['playwright', 'chrome-devtools'],
   });
   expect(r.status).toBe('skipped');
-  expect(calls).toHaveLength(0);
+  expect(calls).toHaveLength(1);
+  expect(calls[0]![0]).toBe('npm');
+  expect(calls[0]![1].slice(0, 2)).toEqual(['install', '-g']);
 });
 
 test('registerPlaywrightMcp: skipped result carries hint about --force-mcp', async () => {
@@ -120,7 +126,7 @@ test('registerPlaywrightMcp: failed on exec throw', async () => {
   expect(r.status).toBe('failed');
 });
 
-test('registerFeishuMcp: registers when absent (uses sh -c wrapper, env vars NOT interpolated at init)', async () => {
+test('registerFeishuMcp: registers when absent (eager-installs lark-mcp first, then claude mcp add with sh -c wrapper)', async () => {
   const calls: Array<[string, string[]]> = [];
   const exec: Exec = async (cmd, args) => {
     calls.push([cmd, args]);
@@ -131,22 +137,30 @@ test('registerFeishuMcp: registers when absent (uses sh -c wrapper, env vars NOT
     listMcpNames: async () => [],
   });
   expect(r.status).toBe('installed');
-  expect(calls).toHaveLength(1);
-  const [cmd, args] = calls[0]!;
-  expect(cmd).toBe('claude');
-  // Must use sh -c wrapper, must contain the literal $LARK_APP_ID (not the resolved value)
-  expect(args).toContain('sh');
-  expect(args).toContain('-c');
-  const shellCmd = args[args.length - 1]!;
+  expect(calls).toHaveLength(2);
+
+  // 1. npm install -g @larksuiteoapi/lark-mcp@<pinned>
+  const [installCmd, installArgs] = calls[0]!;
+  expect(installCmd).toBe('npm');
+  expect(installArgs[0]).toBe('install');
+  expect(installArgs[1]).toBe('-g');
+  expect(installArgs[2]).toMatch(/^@larksuiteoapi\/lark-mcp@\d+\.\d+\.\d+$/);
+
+  // 2. claude mcp add feishu --scope user -- sh -c '<shell with $env placeholders>'
+  const [addCmd, addArgs] = calls[1]!;
+  expect(addCmd).toBe('claude');
+  expect(addArgs).toContain('sh');
+  expect(addArgs).toContain('-c');
+  const shellCmd = addArgs[addArgs.length - 1]!;
   expect(shellCmd).toContain('$LARK_APP_ID');
   expect(shellCmd).toContain('$LARK_APP_SECRET');
   expect(shellCmd).toMatch(/@larksuiteoapi\/lark-mcp@\d+\.\d+\.\d+/);
 });
 
-test('registerFeishuMcp: skips when already registered', async () => {
-  let called = false;
-  const exec: Exec = async () => {
-    called = true;
+test('registerFeishuMcp: still eager-installs lark-mcp even when MCP already registered', async () => {
+  const calls: Array<[string, string[]]> = [];
+  const exec: Exec = async (cmd, args) => {
+    calls.push([cmd, args]);
     return { stdout: '', stderr: '' };
   };
   const r = await registerFeishuMcp({
@@ -154,7 +168,9 @@ test('registerFeishuMcp: skips when already registered', async () => {
     listMcpNames: async () => ['feishu'],
   });
   expect(r.status).toBe('skipped');
-  expect(called).toBe(false);
+  expect(calls).toHaveLength(1);
+  expect(calls[0]![0]).toBe('npm');
+  expect(calls[0]![1].slice(0, 2)).toEqual(['install', '-g']);
 });
 
 test('registerFeishuMcp: skipped result carries hint about --force-mcp', async () => {
@@ -215,15 +231,17 @@ test('ensureLarkCli: failed when install throws', async () => {
 });
 
 test('runAllIntegrations: returns 4 results, does not throw if one fails', async () => {
-  // Make playwright register fail (exec throws on its second call); others succeed.
+  // Make playwright fail at its eager-install step; others succeed.
   let n = 0;
-  const exec: Exec = async (cmd, args) => {
+  const exec: Exec = async () => {
     n++;
-    // Call layout:
-    //  1, 2: superpowers (marketplace add + install)
-    //  3:    playwright mcp add — throw here
-    //  4:    feishu mcp add
-    //  5:    npm install -g lark-cli (only if larkCliPresent=false)
+    // Call layout (when MCPs absent + lark-cli absent):
+    //  1, 2: superpowers (marketplace add + plugin install)
+    //  3:    playwright `npm install -g @playwright/mcp@<v>` — throw here
+    //  4:    playwright `claude mcp add ...`        (skipped, because step 3 threw)
+    //  5:    feishu `npm install -g @larksuiteoapi/lark-mcp@<v>`
+    //  6:    feishu `claude mcp add ...`
+    //  7:    lark-cli `npm install -g @larksuite/cli`
     if (n === 3) throw new Error('playwright boom');
     return { stdout: '', stderr: '' };
   };
@@ -240,7 +258,7 @@ test('runAllIntegrations: returns 4 results, does not throw if one fails', async
   expect(byName['lark-cli']).toBe('installed');
 });
 
-test('runAllIntegrations: when MCPs already registered + lark-cli present → all skipped', async () => {
+test('runAllIntegrations: when MCPs already registered + lark-cli present → MCP packages still eager-installed', async () => {
   const calls: Array<[string, string[]]> = [];
   const exec: Exec = async (cmd, args) => {
     calls.push([cmd, args]);
@@ -252,11 +270,14 @@ test('runAllIntegrations: when MCPs already registered + lark-cli present → al
     larkCliPresent: async () => true,
   });
   expect(results).toHaveLength(4);
-  // superpowers still runs (idempotent on Claude's side); MCPs + lark-cli skipped
+  // superpowers always runs (idempotent on Claude's side); MCP registration
+  // skipped (already there); MCP packages STILL eager-installed; lark-cli skipped.
   expect(results.find((r) => r.name === 'superpowers')!.status).toBe('installed');
   expect(results.find((r) => r.name === 'playwright-mcp')!.status).toBe('skipped');
   expect(results.find((r) => r.name === 'feishu-mcp')!.status).toBe('skipped');
   expect(results.find((r) => r.name === 'lark-cli')!.status).toBe('skipped');
-  // Only the 2 superpowers exec calls happened
-  expect(calls).toHaveLength(2);
+  // 2 superpowers + 1 playwright install + 1 feishu install = 4 calls
+  expect(calls).toHaveLength(4);
+  const npmInstallCalls = calls.filter(([cmd, args]) => cmd === 'npm' && args[0] === 'install' && args[1] === '-g');
+  expect(npmInstallCalls).toHaveLength(2);
 });
