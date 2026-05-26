@@ -26,22 +26,17 @@ git ls-remote https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/ko
 
 如果这条挂住或报 `ETIMEDOUT`，说明 git auth 没就绪 — 见本文末尾 Troubleshooting 章节第一行。
 
-### 安装（3 步）
+### 安装
 
 在你的项目根目录（例如 `~/CodeBuddy/foodmax-backend/`）执行：
 
 ```bash
-# 1. 把包装到 node_modules（--no-save 不写 package.json，下一步 init 会写）
-npm install --no-save https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git#v0.2.1
-
-# 2. 初始化：写项目内文件 + 装 Claude Code plugin + 注册 MCP
-npx foodmax-ai init
-
-# 3. 同步到团队 latest channel（README 滞后时这一步会捞到真正的最新版本）
-npx foodmax-ai update
+npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git#v0.2.1 init
 ```
 
-> 当前各 channel 的版本号见 [versions.json](versions.json)。
+这一条命令做了所有事：npx 把 bootstrapper 从 Codeup 拉下来 → init 检测到项目里还没装 `foodmax-ai-config`、自动跑 `npm install --no-save` 把它装到你的 `node_modules/` → 写项目内文件、注册 plugin、装 MCP。
+
+> 当前各 channel 的版本号见 [versions.json](versions.json)。想跟踪团队 `latest` channel（README 偶尔滞后），init 完之后跑一次 `npx foodmax-ai update`。
 
 ### init 跑完后必做 3 件事
 
@@ -202,7 +197,7 @@ echo 'export LARK_APP_SECRET=xxxxx' >> ~/.zshrc
 |---|---|
 | `npm install ... .git` / `npx ... init` 卡住、`ETIMEDOUT` | Codeup auth 没就绪 — 任选其一：<br>① 浏览器登录一次 Codeup（macOS 会写到 keychain）<br>② 带 PAT：`https://<user>:<token>@bgs2026-ap-southeast-1.devops.alibabacloudcs.com/...`<br>③ 换 SSH URL：`git+ssh://bgs2026@bgs2026-ap-southeast-1.devops.alibabacloudcs.com:codeup/kos/dev-tools/foodmax-ai-config-init.git#v0.2.1` |
 | `claude: command not found` | 装 [Claude Code](https://claude.com/claude-code) |
-| `Installed package not found at .../node_modules/foodmax-ai-config` | 跳过了 step 1。先 `npm install --no-save <url>.git#v0.2.1` 再跑 init |
+| `Installed package not found at .../node_modules/foodmax-ai-config even after \`npm install...\`` | init 已经尝试自动安装但失败，多半是 Codeup auth 没就绪 — 跑 `git ls-remote <url>` 验证你能 clone，然后重跑 init |
 | `Claude Code X.Y.Z does not satisfy required range >=1.0.0` | 升级 Claude Code |
 | `Node 18+ required` | `nvm install 18` 或 `asdf` 切到 18+ |
 | `verify --strict` 在 CI exit 1 | 本地跑 `npx foodmax-ai status --diff` 看 drift；恢复用 `repair` |
