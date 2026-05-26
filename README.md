@@ -144,24 +144,37 @@ git push origin feat/new-thing
 
 ### Release
 
+我们用 [changesets](https://github.com/changesets/changesets) 管理版本和 CHANGELOG。日常 PR 流程：
+
 ```bash
-pnpm test
-pnpm lock         # 必须最新；CI 也会拦
-git tag v0.2.0
-git push --tags
+# 写代码、测试，然后：
+pnpm changeset                  # 选 patch/minor/major + 写一行人类可读描述
+git add . && git commit -m "feat: ..." && git push
 ```
 
-团队成员通过 commit SHA 或 tag pin：
+`pre-push` hook 会拦没 changeset 的 PR（除非 commit message 有 `[skip-changeset]`）。
+
+PR merge 到 main 后，Codeup CI 自动：
+1. 累积所有 `.changeset/*.md` → bump version → 写 CHANGELOG.md → 提 "Version Packages" PR
+2. 你 merge 那个 PR → CI 自动 tag + push + 更新 `versions.json["channels"]["latest"]`
+
+零手动 `git tag`。详见 [RELEASING.md](RELEASING.md)。
+
+团队成员通过 tag pin（自动获得最新可用版本）：
 
 ```json
 "devDependencies": { "foodmax-ai-config": "https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git#v0.2.0" }
 ```
 
+或者用 `npx foodmax-ai update --version 0.2.0` / `--channel beta`（Sprint 1 引入的 flag）。
+
 ### 改了 MCP 注册参数时
 
-如果 release 里改了 `src/lib/constants.ts` 中任何 MCP 的注册命令（例如 pin 版本、加 flag、换 transport），普通 `update` 因为 idempotency 检查会 skip 已注册的 MCP。release notes 里要点名：
+如果 changeset 里包含 `## MCP 参数变更` section，CHANGELOG 会被特殊渲染提醒同事。同时在飞书群点名：
 
 > ⚠️ 本次升级修改了 MCP 注册参数，请用 `npx foodmax-ai update --force-mcp` 升级。
+
+（Sprint 2 当前 changesets 默认 changelog generator 还不会自动加这段警告；维护者 release 后须手动核对一次 CHANGELOG.md 的相关条目。Sprint 3 计划接入 custom generator 自动化此事。）
 
 ---
 
