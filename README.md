@@ -28,7 +28,19 @@ npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-t
 6. 写一个 `.foodmax-ai.lock.json` 记录当前版本
 7. 自动装 4 个团队默认集成（见下方"`init` installs what?"）
 
-**前置条件：** 已安装 [Claude Code](https://claude.com/claude-code)、Node 18+、本机 git 有访问 Codeup `kos/dev-tools/foodmax-ai-config-init` 私有 repo 的权限（公司 SSO 或 git credential helper）。
+**前置条件：** 已安装 [Claude Code](https://claude.com/claude-code) `>=1.0.0`、Node 18+、本机 git 有访问 Codeup `kos/dev-tools/foodmax-ai-config-init` 私有 repo 的权限（公司 SSO 或 git credential helper）。Claude Code 版本不达标 `init` 会直接报错。
+
+### 装特定版本 / channel
+
+```bash
+# 装指定 release tag
+npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git init --version 1.2.3
+
+# 装 beta channel（尝鲜）
+npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git init --channel beta
+```
+
+可用 channel 在 [versions.json](versions.json) 里查（`latest`、`beta` 等）。`--version` 和 `--channel` 互斥。两者都不传 = 默认 `latest`。同样的 flag 也适用于 `update` 命令。
 
 ### `init` installs what?
 
@@ -72,6 +84,15 @@ npx foodmax-ai update
 ```
 
 这会：拉最新包 → 刷 Claude plugin → **重跑所有集成**（superpowers / playwright MCP / feishu MCP / lark-cli，新增的集成自动装上）→ 重写项目锁。
+
+#### 升降级到指定版本
+
+```bash
+npx foodmax-ai update --version 1.2.3   # 强制装 1.2.3
+npx foodmax-ai update --channel beta    # 切到 beta channel
+```
+
+如果你装的版本被维护者标记为 deprecated，`update` 会在 stdout 警告并给出建议升级目标（`Fixed in vX.Y.Z`）。
 
 #### MCP 参数变了？加 `--force-mcp`
 
