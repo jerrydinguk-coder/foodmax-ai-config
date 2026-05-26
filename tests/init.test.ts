@@ -1,5 +1,5 @@
 import { test, expect, beforeEach, afterEach, vi } from 'vitest';
-import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { runInit } from '../src/commands/init.js';
 import { makeTempProject, makeFakeInstalledPackage } from './helpers/tempProject.js';
@@ -329,4 +329,93 @@ test('init warns but proceeds for warn-severity deprecation', async () => {
   } finally {
     spy.mockRestore();
   }
+});
+
+test('init self-installs when package missing from cwd node_modules', async () => {
+  // Simulate the `npx -y <git-url> init` scenario: the package is NOT pre-staged
+  // in the consumer project's node_modules. init should shell `npm install
+  // --no-save <SOURCE>#<tag>` itself, then proceed.
+  rmSync(pkgRoot, { recursive: true, force: true });
+  expect(existsSync(pkgRoot)).toBe(false);
+
+  const exec = async (cmd: string, args: string[]) => {
+    execCalls.push([cmd, args]);
+    // Simulate npm install materializing the package on disk.
+    if (cmd === 'npm' && args[0] === 'install') {
+      makeFakeInstalledPackage(project.dir);
+    }
+    return { stdout: '', stderr: '' };
+  };
+
+  await runInit({
+    cwd: project.dir,
+    // intentionally NO packageRootOverride
+    exec,
+    claudeDetect: fakeClaudeDetect,
+    larkCliPresent: fakeLarkCliPresent,
+    listMcpNames: fakeListMcpNames,
+    fetchVersions: fakeFetchVersions,
+    yes: true,
+  });
+
+  const npmCall = execCalls.find(
+    ([cmd, args]) => cmd === 'npm' && args[0] === 'install' && args[1] === '--no-save'
+  );
+  expect(npmCall).toBeDefined();
+  expect(npmCall![1][2]).toContain('foodmax-ai-config-init.git');
+  expect(npmCall![1][2]).toContain('#v1.2.3');
+
+  expect(existsSync(join(project.dir, '.foodmax-ai.lock.json'))).toBe(true);
+});
+
+test('init throws if self-install fails to materialize the package', async () => {
+  rmSync(pkgRoot, { recursive: true, force: true });
+
+  // Exec that "succeeds" silently but doesn't create the package
+  const exec = async (cmd: string, args: string[]) => {
+    execCalls.push([cmd, args]);
+    return { stdout: '', stderr: '' };
+  };
+
+  await expect(
+    runInit({
+      cwd: project.dir,
+      exec,
+      claudeDetect: fakeClaudeDetect,
+      larkCliPresent: fakeLarkCliPresent,
+      listMcpNames: fakeListMcpNames,
+      fetchVersions: fakeFetchVersions,
+      yes: true,
+    })
+  ).rejects.toThrow(/Installed package not found/i);
+});
+
+test('init --dry-run prints would-install line and does not shell out', async () => {
+  rmSync(pkgRoot, { recursive: true, force: true });
+
+  const logs: string[] = [];
+  const spy = vi.spyOn(console, 'log').mockImplementation((...args) => {
+    logs.push(args.map(String).join(' '));
+  });
+  try {
+    await runInit({
+      cwd: project.dir,
+      exec: fakeExec,
+      claudeDetect: fakeClaudeDetect,
+      larkCliPresent: fakeLarkCliPresent,
+      listMcpNames: fakeListMcpNames,
+      fetchVersions: fakeFetchVersions,
+      yes: true,
+      dryRun: true,
+    });
+  } finally {
+    spy.mockRestore();
+  }
+
+  // No real shell-out in dry-run
+  expect(execCalls.find(([cmd]) => cmd === 'npm')).toBeUndefined();
+  // Output should mention the install it would run
+  const joined = logs.join('\n');
+  expect(joined).toMatch(/npm install/);
+  expect(joined).toMatch(/--no-save/);
 });

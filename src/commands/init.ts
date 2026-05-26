@@ -83,21 +83,13 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
   requireNotBlocked(versionsJson, resolved.version);
 
   const pkgRoot = opts.packageRootOverride ?? join(opts.cwd, 'node_modules', PACKAGE_NAME);
-  if (!existsSync(join(pkgRoot, 'package.json'))) {
-    throw new Error(
-      `Installed package not found at ${pkgRoot}. If this is your first init, install first: \`npm install --no-save ${SOURCE}\``
-    );
-  }
-
-  // Sanity: package's own lockfile exists & self-checks
-  const internalLockPath = join(pkgRoot, packageLockfileName());
-  if (!existsSync(internalLockPath)) {
-    throw new Error(`Installed package missing ${packageLockfileName()}. Package may be corrupted.`);
-  }
-  const internalLock = readLockfile(internalLockPath);
+  const pkgInstalled = existsSync(join(pkgRoot, 'package.json'));
 
   if (opts.dryRun) {
     console.log(info(bold('[dry-run] Would perform:')));
+    if (!pkgInstalled) {
+      console.log(info(`  - Run: npm install --no-save ${pinnedSource}`));
+    }
     console.log(info(`  - Merge ${join(opts.cwd, 'CLAUDE.md')} with team region`));
     console.log(info(`  - Add devDep "${PACKAGE_NAME}" to package.json`));
     console.log(info(`  - Append .gitignore`));
@@ -107,6 +99,28 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
     console.log(info(`  - Write ${projectLockfileName()}`));
     return;
   }
+
+  if (!pkgInstalled) {
+    console.log(info(`Package not in node_modules; installing ${pinnedSource}…`));
+    try {
+      await exec('npm', ['install', '--no-save', pinnedSource]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`npm install --no-save ${pinnedSource} failed: ${msg}`);
+    }
+    if (!existsSync(join(pkgRoot, 'package.json'))) {
+      throw new Error(
+        `Installed package not found at ${pkgRoot} even after \`npm install --no-save ${pinnedSource}\`. Check that you can reach Codeup (\`git ls-remote ${SOURCE}\`).`
+      );
+    }
+  }
+
+  // Sanity: package's own lockfile exists & self-checks
+  const internalLockPath = join(pkgRoot, packageLockfileName());
+  if (!existsSync(internalLockPath)) {
+    throw new Error(`Installed package missing ${packageLockfileName()}. Package may be corrupted.`);
+  }
+  const internalLock = readLockfile(internalLockPath);
 
   // Step 1: project files
   writeProjectClaudeMd(opts.cwd);
