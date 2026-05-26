@@ -1,181 +1,146 @@
 # foodmax-ai-config
 
-> FoodMax 团队统一的 AI 助手配置（Claude Code plugin + npm CLI）
+> FoodMax 团队统一的 AI 助手配置 — 既是 **Claude Code plugin**（team skills、hooks、CLAUDE.md），也是 **npm CLI**（`npx foodmax-ai` 锁版本、CI 守门）。
 
-一个 git 仓库，既是 Claude Code plugin、也是 npm 包：
-
-- **Plugin 形态**：team skills、hooks、CLAUDE.md 通过 `claude plugin install` 落到每个工程师本地
-- **npm 形态**：`npx foodmax-ai` CLI 提供 init / verify / status / repair / update，让项目级配置可锁版本、可在 CI 守门
+一行命令把团队规则、Claude Code skills、MCP 集成统一落到你的开发环境，并由 lockfile 保证大家用的是同一份。
 
 ---
 
-## 给团队成员（90% 读者）
+## 目录
 
-### 第一次设置
+- [快速开始](#快速开始) · 90% 读者
+- [日常操作](#日常操作)
+- [Feishu 凭据](#feishu-凭据)
+- [团队 Skill](#团队-skill)
+- [安全 & deprecation](#安全--deprecation)
+- [Troubleshooting](#troubleshooting)
+- [给维护者](#给维护者) · 5% 读者
+- [v1 不做的事](#v1-不做的事)
+- [反馈 & 贡献](#反馈--贡献)
 
-在你的 FoodMax 项目根目录（例如 `~/CodeBuddy/foodmax-backend/`）下跑：
+---
+
+## 快速开始
+
+### 前置条件
+
+| 工具 | 版本 | 说明 |
+|---|---|---|
+| [Claude Code](https://claude.com/claude-code) | `>=1.0.0` | 不满足 `init` 会直接报错 |
+| Node | `18+` | |
+| Git | 任意 | 需能 clone Codeup 私有 repo（公司 SSO 或 git credential helper） |
+
+### 安装
+
+在你的 FoodMax 项目根目录（例如 `~/CodeBuddy/foodmax-backend/`）跑：
 
 ```bash
 npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git init
 ```
 
-它会：
-1. 把团队 CLAUDE.md 规则区块插入项目的 `CLAUDE.md`
-2. 把 `foodmax-ai-config` 加进 `package.json` 的 devDependencies
-3. 把 `.claude/settings.local.json` 加进 `.gitignore`
-4. 在 `.github/workflows/` 写一个 verify workflow
-5. 安装 Claude Code plugin 到 `~/.claude/`（让 skills/hooks 全局可用）
-6. 写一个 `.foodmax-ai.lock.json` 记录当前版本
-7. 自动装 4 个团队默认集成（见下方"`init` installs what?"）
+### 之后 3 步
 
-**前置条件：** 已安装 [Claude Code](https://claude.com/claude-code) `>=1.0.0`、Node 18+、本机 git 有访问 Codeup `kos/dev-tools/foodmax-ai-config-init` 私有 repo 的权限（公司 SSO 或 git credential helper）。Claude Code 版本不达标 `init` 会直接报错。
+1. **重启 Claude Code** — 让 plugin / MCP 生效
+2. **配置 Feishu 凭据** — 见 [Feishu 凭据](#feishu-凭据)
+3. **Commit `.github/workflows/ai-config-verify.yml`** — 让 CI 帮你守门
 
-**安全提示：** 每次跑 `foodmax-ai <任何命令>`，CLI 会在启动时悄悄检查项目当前版本有没有被维护者标记为 deprecated。如果有，会打印一条警告。`init` / `update` 时如果版本被标记为 `severity: "block"`（严重 bug 或安全问题），会**硬拦**安装，必须升级到 fixedIn 版本。详见 [SECURITY.md](SECURITY.md)。
+---
 
-### 装特定版本 / channel
+## init 做了什么
 
-```bash
-# 装指定 release tag
-npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git init --version 1.2.3
-```
+| 项目内改动 | 全局安装（best-effort） |
+|---|---|
+| 插入团队规则到 `CLAUDE.md` | `superpowers` plugin (TDD / brainstorming / parallel-agents 等) |
+| `foodmax-ai-config` 加进 `package.json` devDependencies | Playwright MCP |
+| `.claude/settings.local.json` 加进 `.gitignore` | Feishu MCP (`@larksuiteoapi/lark-mcp`) |
+| `.github/workflows/ai-config-verify.yml` | `@larksuite/cli` (`lark-cli`) |
+| `.foodmax-ai.lock.json` 记录版本 | |
 
-可用 channel 在 [versions.json](versions.json) 里查（目前只有 `latest`）。`--version` 和 `--channel` 互斥。两者都不传 = 默认 `latest`。同样的 flag 也适用于 `update` 命令。
+> 全局集成是 **best-effort**：任一失败只打 `⚠` 警告，不会中断 init。重跑 `init` 会自动补装。
 
-### `init` installs what?
+---
 
-除了 `foodmax-ai-config` plugin 本身，`init` 还会自动落 4 个生产力集成（已注册的会跳过，不会重复装）：
+## 日常操作
 
-| 集成 | 装什么 | 怎么落 |
-|---|---|---|
-| superpowers plugin | obra/superpowers — TDD / brainstorming / parallel-agents 等元 skill | `claude plugin install superpowers@superpowers-dev --scope user` |
-| Playwright MCP | 让 Claude 能开浏览器自动化 | `claude mcp add playwright --scope user -- npx -y @playwright/mcp@latest` |
-| Feishu MCP | 飞书机器人 / 多维表格 / 消息 API | `claude mcp add feishu --scope user -- sh -c '…lark-mcp…'`（用环境变量读 token） |
-| `@larksuite/cli` | `lark-cli` 命令行（机器人调试、登录、推消息） | 检测到没装就 `npm install -g @larksuite/cli` |
-
-**这些集成是 best-effort：** 任何一个失败不会让 `init` 整体退出，只会打 `⚠` 警告。如果你想后悔某个，手动 `claude plugin remove <name>` / `claude mcp remove <name>` / `npm uninstall -g @larksuite/cli` 即可。
-
-### Setup Feishu credentials
-
-Feishu MCP 在每次启动时会从你的 shell env 读 `$LARK_APP_ID` / `$LARK_APP_SECRET`。`init` **不会** 帮你写这两个变量（团队公用一组 token 不安全）。第一次 `init` 之后，从团队飞书管理员那里拿 token，或在 [open.feishu.cn](https://open.feishu.cn) 自建应用拿，然后：
-
-```bash
-# Get from team Feishu admin or your own app at open.feishu.cn
-echo 'export LARK_APP_ID=cli_xxxxx' >> ~/.zshrc
-echo 'export LARK_APP_SECRET=xxxxx' >> ~/.zshrc
-# 重启 Claude Code 让 MCP 进程读到新 env
-```
-
-没设也没事，feishu MCP 会启动，但每次调用都会 `lark unauthorized`。
-
-### 重启 Claude Code
-
-让 plugin 生效。
-
-### 团队 skill 使用
-
-- 写 PR 描述：`/foodmax-pr-description`
-- 创建新模块脚手架：`/foodmax-new-module`
-
-### 同步最新规则
+### 同步最新配置
 
 ```bash
 npx foodmax-ai update
 ```
 
-这会：拉最新包 → 刷 Claude plugin → **重跑所有集成**（superpowers / playwright MCP / feishu MCP / lark-cli，新增的集成自动装上）→ 重写项目锁。
+拉最新包 → 刷 plugin → 重跑集成 → 重写 lockfile。
 
-#### 升降级到指定版本
+### 装/降到指定版本
 
 ```bash
-npx foodmax-ai update --version 1.2.3   # 强制装 1.2.3
+npx foodmax-ai update --version 0.2.1
 ```
 
-如果你装的版本被维护者标记为 deprecated，`update` 会在 stdout 警告并给出建议升级目标（`Fixed in vX.Y.Z`）。
+可用版本见 [versions.json](versions.json)。
 
-#### MCP 参数变了？加 `--force-mcp`
+### MCP 注册参数变了？加 `--force-mcp`
 
-如果维护者改了某个 MCP 的注册参数（例如 `@playwright/mcp` 从 `latest` 改成 `1.0.5`），普通 `update` 看到 MCP 已注册会 skip。这时需要：
+如果维护者改了某个 MCP 的注册参数（例如 `@playwright/mcp` 从 `latest` 改成 `1.0.5`），普通 `update` 看到 MCP 已注册会跳过。维护者通知"请加 `--force-mcp`"时：
 
 ```bash
 npx foodmax-ai update --force-mcp
 ```
 
-它会先 `claude mcp remove` 包内管理的 MCP（playwright + feishu），再重新注册。维护者发这种变更时会在 announce 里点名要求加这个 flag。
+会先 `claude mcp remove` 包内管理的 MCP（playwright + feishu），再重新注册。
 
-### 在 CI 里守门
+### 状态查询
 
-`init` 已经写好了 `.github/workflows/ai-config-verify.yml`。commit 进项目后，每个 PR 都会跑 `npx foodmax-ai verify --strict` —— 谁改了 node_modules/foodmax-ai-config/ 里的文件，PR 就过不去。
+```bash
+npx foodmax-ai status              # 列出与团队版本的 drift
+npx foodmax-ai status --diff       # 看 drift 具体内容
+npx foodmax-ai verify              # CI 用：--strict 时 drift exit 1
+npx foodmax-ai repair              # 一键覆盖回团队版本
+```
 
-### 本地实验性改 skill
+### 本地实验改 skill
 
-直接改 `node_modules/foodmax-ai-config/skills/.../SKILL.md` 就行。本地 `verify` 是软警告不挡路。
+直接改 `node_modules/foodmax-ai-config/skills/.../SKILL.md`。本地 `verify` 软警告，不挡你。
 
-- 实验成功想保留 → 提 PR 到 Codeup `kos/dev-tools/foodmax-ai-config-init`
-- 想放弃 → `npx foodmax-ai repair`
+- 实验成功想保留 → 提 PR 到 [Codeup repo](https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init)
+- 想丢弃 → `npx foodmax-ai repair`
 
 ---
 
-## 给维护者（5% 读者）
+## Feishu 凭据
 
-### 加新 skill
+Feishu MCP 启动时读 `$LARK_APP_ID` / `$LARK_APP_SECRET`。`init` **不会**帮你写这两个变量（团队公用一组 token 不安全）。
+
+从飞书管理员那里拿，或在 [open.feishu.cn](https://open.feishu.cn) 自建应用拿，然后：
 
 ```bash
-# 1. 写
-mkdir skills/foodmax-new-thing
-cat > skills/foodmax-new-thing/SKILL.md <<'EOF'
+echo 'export LARK_APP_ID=cli_xxxxx' >> ~/.zshrc
+echo 'export LARK_APP_SECRET=xxxxx' >> ~/.zshrc
+# 重启 Claude Code 让 MCP 读到新 env
+```
+
+没设也能跑，但每次调用都会 `lark unauthorized`。
+
 ---
-name: foodmax-new-thing
-description: ...
+
+## 团队 Skill
+
+| Slash 命令 | 用途 |
+|---|---|
+| `/foodmax-pr-description` | 生成符合团队规范的 PR 描述 |
+| `/foodmax-new-module` | 创建新模块脚手架 |
+
 ---
-# Foodmax New Thing
-...
-EOF
 
-# 2. 重算锁
-pnpm lock
+## 安全 & deprecation
 
-# 3. 提 PR
-git add skills/ .locked.json
-git commit -m "skills: add foodmax-new-thing"
-git push origin feat/new-thing
-```
+每次跑 `foodmax-ai <任何命令>`，CLI 启动时会悄悄检查项目当前版本是否被维护者标记为 deprecated：
 
-### Release
+| Prefix | 含义 | 行为 |
+|---|---|---|
+| `⚠️  DEPRECATED:` | 老版本有问题但不严重 | 警告，命令照常执行 |
+| `🚫 BLOCKED:` | 严重 bug 或安全问题 | `init` / `update` **硬拦**，必须升级到 `fixedIn` 版本 |
 
-我们用 [changesets](https://github.com/changesets/changesets) 管理版本和 CHANGELOG。日常 PR 流程：
-
-```bash
-# 写代码、测试，然后：
-pnpm changeset                  # 选 patch/minor/major + 写一行人类可读描述
-git add . && git commit -m "feat: ..." && git push
-```
-
-`pre-push` hook 会拦没 changeset 的 PR（除非 commit message 有 `[skip-changeset]`）。
-
-PR merge 到 main 后，维护者本地跑：
-
-```bash
-pnpm version-packages    # 累积 changesets → bump version + 写 CHANGELOG
-pnpm release             # tag + push + 更新 versions.json
-```
-
-⚠️ Sprint 2 当前 release 是手动的（Codeup 仓库不自动识别 CI 文件，等管理员接入云效 Flow 才能自动化）。详见 [RELEASING.md](RELEASING.md)。
-
-团队成员通过 tag pin（自动获得最新可用版本）：
-
-```json
-"devDependencies": { "foodmax-ai-config": "https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git#v0.2.0" }
-```
-
-或者用 `npx foodmax-ai update --version 0.2.0`（Sprint 1 引入的 flag）。
-
-### 改了 MCP 注册参数时
-
-如果 changeset 里包含 `## MCP 参数变更` section，CHANGELOG 会被特殊渲染提醒同事。同时在飞书群点名：
-
-> ⚠️ 本次升级修改了 MCP 注册参数，请用 `npx foodmax-ai update --force-mcp` 升级。
-
-（Sprint 2 当前 changesets 默认 changelog generator 还不会自动加这段警告；维护者 release 后须手动核对一次 CHANGELOG.md 的相关条目。Sprint 3 计划接入 custom generator 自动化此事。）
+发现漏洞请通过 [SECURITY.md](SECURITY.md) 私下联系，不要提 public issue。
 
 ---
 
@@ -184,22 +149,78 @@ pnpm release             # tag + push + 更新 versions.json
 | 现象 | 解 |
 |---|---|
 | `claude: command not found` | 装 [Claude Code](https://claude.com/claude-code) |
-| `verify` 在 CI exit 1 | 本地 `npx foodmax-ai status --diff` 看 drift |
-| 第一次 init 拉不下来 repo | 检查 git credential helper 或 SSO，能否 clone `https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git` |
-| `pnpm lock` CI 失败 | 本地跑 `pnpm lock` 并把 `.locked.json` 一起 commit |
-| feishu MCP 所有调用 401 | `echo $LARK_APP_ID` 看是不是空；写到 `~/.zshrc` 后**重启** Claude Code |
-| `lark-cli: command not found` 但 `init` 报 installed | 新装的 npm global bin 还没 source；开新 terminal 或 `source ~/.zshrc` |
-| `init`/`update` 输出 `MCP "X" already registered` 的 warning | 你本地已有同名 MCP，团队规范的注册参数没贴上。`claude mcp list` 确认；想替换成团队版跑 `npx foodmax-ai update --force-mcp` |
-| `🚫 BLOCKED: v...` 启动报错 | 你装的版本被维护者标记为危险（见 SECURITY.md）。立刻 `npx foodmax-ai update --version <fixedIn>` 升级 |
+| `verify` 在 CI exit 1 | 本地跑 `npx foodmax-ai status --diff` 看 drift |
+| 第一次 init 拉不下 repo | 检查公司 SSO / git credential helper |
+| `init` 跑一半失败 | 重跑就行，init 是 idempotent 的 |
+| `pnpm lock` 在 CI 失败 | 本地跑 `pnpm lock`，commit `.locked.json` |
+| Feishu MCP 全 401 | `echo $LARK_APP_ID` 是否空；写 `~/.zshrc` 后**重启** Claude Code |
+| `lark-cli: command not found` 但 init 报已装 | 开新 terminal 或 `source ~/.zshrc` |
+| `MCP "X" already registered` 警告 | 本地已有同名 MCP；想换成团队版跑 `update --force-mcp` |
+| `🚫 BLOCKED: v...` 报错 | 装的版本被维护者禁用；`update --version <fixedIn>` 升级 |
 
 ---
 
-## 显式不做（v1 YAGNI）
+## 给维护者
 
-- Cursor / Codex 支持
-- 数字签名 / GPG
+### 加新 skill
+
+```bash
+mkdir skills/foodmax-new-thing
+# 写 skills/foodmax-new-thing/SKILL.md (带 frontmatter)
+pnpm lock                                    # 重算 .locked.json
+git add skills/ .locked.json
+git commit -m "feat(skills): add foodmax-new-thing"
+git push origin feat/new-thing
+# 提 PR
+```
+
+### 日常 PR
+
+```bash
+pnpm changeset                               # 选 patch/minor/major + 一行人话描述
+git add . && git commit -m "feat: ..." && git push
+```
+
+`pre-push` hook 会拦没 changeset 的 PR（除非 commit message 含 `[skip-changeset]`，仅限纯 docs/test/ci 改动）。
+
+### Cut a release
+
+```bash
+pnpm pre-release                             # 自检：typecheck + test + build + lockfile + audit + git
+pnpm version-packages                        # bump version + 写 CHANGELOG
+pnpm release                                 # tag + push + update versions.json
+```
+
+完整流程 + 漏洞响应 + rollback 见 [RELEASING.md](RELEASING.md)。
+
+> ⚠️ Release 当前手动。Codeup 不自动识别 repo 内 CI 文件，等管理员接入云效 Flow 才能自动化。
+
+### 改了 MCP 注册参数
+
+changeset 描述里点明，release 后在飞书群提醒：
+
+> ⚠️ 本次升级修改了 MCP 注册参数，请用 `npx foodmax-ai update --force-mcp` 升级。
+
+---
+
+## v1 不做的事
+
+明确不支持 — 不是优先级问题，是设计边界：
+
+- Cursor / Codex 集成
+- 数字签名 / GPG（信任边界是 Codeup repo ACL + lockfile sha256）
 - Windows
 - Web UI
 - 私有 npm registry 适配
 
-详见 [设计文档](docs/superpowers/specs/2026-05-25-foodmax-ai-config-design.md) §14。
+理由详见 [设计文档 §14](docs/superpowers/specs/2026-05-25-foodmax-ai-config-design.md)。
+
+---
+
+## 反馈 & 贡献
+
+| 类型 | 渠道 |
+|---|---|
+| 用法问题 / Bug | 飞书 @epingpong 或团队群 at |
+| 漏洞 | [SECURITY.md](SECURITY.md) — **不要发 public issue** |
+| 想贡献新 skill / 改进 | 提 PR 到 [Codeup repo](https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init) |
