@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { resolveVersion, checkDeprecated, type VersionsJson } from '../src/lib/versions.js';
+import { resolveVersion, checkDeprecated, type VersionsJson, fetchVersions, type FetchVersionsDeps } from '../src/lib/versions.js';
 
 const fakeVersions: VersionsJson = {
   schemaVersion: 1,
@@ -54,4 +54,33 @@ test('checkDeprecated returns matching entry when version is deprecated', () => 
 
 test('checkDeprecated returns null when version is fine', () => {
   expect(checkDeprecated(fakeVersions, '1.2.3')).toBeNull();
+});
+
+test('fetchVersions uses raw URL first, returns parsed JSON', async () => {
+  const deps: FetchVersionsDeps = {
+    httpGet: async (url) => {
+      expect(url).toContain('/-/raw/main/versions.json');
+      return { ok: true, body: JSON.stringify(fakeVersions) };
+    },
+    shallowCloneVersionsJson: async () => { throw new Error('should not fallback'); },
+  };
+  const r = await fetchVersions(deps);
+  expect(r.channels.latest.version).toBe('1.2.3');
+});
+
+test('fetchVersions falls back to shallow clone when raw URL fails', async () => {
+  const deps: FetchVersionsDeps = {
+    httpGet: async () => ({ ok: false, body: 'not found' }),
+    shallowCloneVersionsJson: async () => JSON.stringify(fakeVersions),
+  };
+  const r = await fetchVersions(deps);
+  expect(r.channels.latest.version).toBe('1.2.3');
+});
+
+test('fetchVersions throws when both raw URL and shallow clone fail', async () => {
+  const deps: FetchVersionsDeps = {
+    httpGet: async () => ({ ok: false, body: 'x' }),
+    shallowCloneVersionsJson: async () => { throw new Error('git failed'); },
+  };
+  await expect(fetchVersions(deps)).rejects.toThrow(/versions\.json/i);
 });
