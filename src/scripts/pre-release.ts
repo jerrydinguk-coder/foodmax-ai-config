@@ -110,7 +110,13 @@ export async function runPreRelease(deps: PreReleaseDeps = defaultDeps): Promise
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  runPreRelease().catch((e) => {
+  runPreRelease().then((r) => {
+    if (!r.ok) {
+      console.error(`\n❌ pre-release failed: ${r.failures.length} check(s) failed`);
+      process.exit(1);
+    }
+    console.log('\n✓ pre-release passed');
+  }).catch((e) => {
     console.error(e);
     process.exit(1);
   });
