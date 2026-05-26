@@ -24,9 +24,9 @@ import {
 import {
   fetchVersions as defaultFetchVersions,
   resolveVersion,
-  checkDeprecated,
   type VersionsJson,
 } from '../lib/versions.js';
+import { warnIfDeprecated, requireNotBlocked } from '../lib/deprecation.js';
 import { detectClaudeCli, requireClaudeVersion, type DetectResult } from '../lib/claude-detect.js';
 
 const _exec = promisify(execFile);
@@ -69,10 +69,8 @@ export async function runUpdate(opts: RunUpdateOptions): Promise<void> {
   const resolved = resolveVersion(versionsJson, { version: opts.version, channel: opts.channel });
   const pinnedSource = `${SOURCE}#${resolved.tag}`;
 
-  const dep = checkDeprecated(versionsJson, resolved.version);
-  if (dep) {
-    console.warn(warn(`⚠️  v${dep.version} is deprecated: ${dep.reason}. Fixed in v${dep.fixedIn}.`));
-  }
+  warnIfDeprecated(versionsJson, resolved.version);
+  requireNotBlocked(versionsJson, resolved.version);
 
   const reinstall =
     opts.reinstall ??

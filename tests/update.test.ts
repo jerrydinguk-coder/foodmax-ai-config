@@ -371,3 +371,27 @@ test('update blocks when Claude Code version is below peerRequirements', async (
     })
   ).rejects.toThrow(/Claude Code 0\.5\.0/);
 });
+
+test('update refuses to install a version marked severity=block', async () => {
+  const fakeBlocked: VersionsJson = {
+    ...updateFakeVersions,
+    deprecated: [
+      {
+        version: '1.2.3',
+        reason: 'critical: MCP secret leak',
+        fixedIn: '1.2.4',
+        deprecatedAt: '2026-05-20T00:00:00Z',
+        severity: 'block',
+      },
+    ],
+  };
+  await expect(
+    runUpdate({
+      cwd: project.dir,
+      packageRootOverride: pkgRoot,
+      ...sharedUpdateOpts,
+      fetchVersions: async () => fakeBlocked,
+      version: '1.2.3',
+    })
+  ).rejects.toThrow(/blocked/i);
+});
