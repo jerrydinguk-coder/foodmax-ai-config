@@ -30,6 +30,8 @@ npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-t
 
 **前置条件：** 已安装 [Claude Code](https://claude.com/claude-code) `>=1.0.0`、Node 18+、本机 git 有访问 Codeup `kos/dev-tools/foodmax-ai-config-init` 私有 repo 的权限（公司 SSO 或 git credential helper）。Claude Code 版本不达标 `init` 会直接报错。
 
+**安全提示：** 每次跑 `foodmax-ai <任何命令>`，CLI 会在启动时悄悄检查项目当前版本有没有被维护者标记为 deprecated。如果有，会打印一条警告。`init` / `update` 时如果版本被标记为 `severity: "block"`（严重 bug 或安全问题），会**硬拦**安装，必须升级到 fixedIn 版本。详见 [SECURITY.md](SECURITY.md)。
+
 ### 装特定版本 / channel
 
 ```bash
@@ -192,6 +194,7 @@ pnpm release             # tag + push + 更新 versions.json
 | feishu MCP 所有调用 401 | `echo $LARK_APP_ID` 看是不是空；写到 `~/.zshrc` 后**重启** Claude Code |
 | `lark-cli: command not found` 但 `init` 报 installed | 新装的 npm global bin 还没 source；开新 terminal 或 `source ~/.zshrc` |
 | `init`/`update` 输出 `MCP "X" already registered` 的 warning | 你本地已有同名 MCP，团队规范的注册参数没贴上。`claude mcp list` 确认；想替换成团队版跑 `npx foodmax-ai update --force-mcp` |
+| `🚫 BLOCKED: v...` 启动报错 | 你装的版本被维护者标记为危险（见 SECURITY.md）。立刻 `npx foodmax-ai update --version <fixedIn>` 升级 |
 
 ---
 
