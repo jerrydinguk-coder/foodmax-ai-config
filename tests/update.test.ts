@@ -259,6 +259,7 @@ test('update records channel + resolvedFrom in lockfile on tag switch', async ()
     cwd: project.dir,
     packageRootOverride: pkgRoot,
     ...baseUpdate,
+    exec: async () => ({ stdout: '', stderr: '' }),
     tag: 'beta',
   });
   const lock = JSON.parse(readFileSync(join(project.dir, '.foodmax-ai.lock.json'), 'utf8'));
