@@ -19,6 +19,7 @@ function makeDeps(overrides: Partial<VersionPackagesDeps> = {}): {
     gitCommit: [] as string[],
     gitPush: [] as string[],
     writeMarketplace: [] as unknown[],
+    writePluginJson: [] as unknown[],
   };
   const deps: VersionPackagesDeps = {
     listChangesets: async () => {
@@ -32,6 +33,10 @@ function makeDeps(overrides: Partial<VersionPackagesDeps> = {}): {
     readMarketplace: async () => ({ plugins: [{ version: 'old', name: 'foodmax-ai-config' }] }),
     writeMarketplace: async (data) => {
       calls.writeMarketplace.push(data);
+    },
+    readPluginJson: async () => ({ name: 'foodmax-ai-config', version: 'old' }),
+    writePluginJson: async (data) => {
+      calls.writePluginJson.push(data);
     },
     gitAdd: async (paths) => {
       calls.gitAdd.push(paths);
@@ -81,4 +86,13 @@ test('runVersionPackages syncs marketplace.json version from package.json after 
   const written = calls.writeMarketplace[0] as { plugins: Array<{ version: string }> };
   expect(written.plugins[0]!.version).toBe('new');
   expect(calls.gitAdd[0]).toContain('.claude-plugin/marketplace.json');
+});
+
+test('runVersionPackages also syncs plugin.json version (Claude reads it for display)', async () => {
+  const { deps, calls } = makeDeps();
+  await runVersionPackages(deps);
+  expect(calls.writePluginJson).toHaveLength(1);
+  const written = calls.writePluginJson[0] as { version: string };
+  expect(written.version).toBe('new');
+  expect(calls.gitAdd[0]).toContain('plugin.json');
 });
