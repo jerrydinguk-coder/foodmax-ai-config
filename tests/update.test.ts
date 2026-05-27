@@ -76,7 +76,7 @@ test('update runs integrations so new integrations propagate automatically', asy
       args[0] === 'plugin' &&
       args[1] === 'marketplace' &&
       args[2] === 'add' &&
-      args[3] === 'github:obra/superpowers'
+      args[3] === 'obra/superpowers'
   );
   const hasPlaywrightAdd = execCalls.some(
     ([cmd, args]) =>
@@ -188,7 +188,7 @@ test('update integration failures do NOT fail the overall update (lockfile still
         args[0] === 'plugin' &&
         args[1] === 'marketplace' &&
         args[2] === 'add' &&
-        args[3] === 'github:obra/superpowers'
+        args[3] === 'obra/superpowers'
       ) {
         throw new Error('network down');
       }

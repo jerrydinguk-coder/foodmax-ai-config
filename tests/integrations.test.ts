@@ -40,7 +40,7 @@ test('installSuperpowers: happy path returns installed', async () => {
   };
   const r = await installSuperpowers({ exec });
   expect(r.status).toBe('installed');
-  expect(calls[0]).toEqual(['claude', ['plugin', 'marketplace', 'add', 'github:obra/superpowers']]);
+  expect(calls[0]).toEqual(['claude', ['plugin', 'marketplace', 'add', 'obra/superpowers']]);
   expect(calls[1]).toEqual([
     'claude',
     ['plugin', 'install', 'superpowers@superpowers-dev', '--scope', 'user'],

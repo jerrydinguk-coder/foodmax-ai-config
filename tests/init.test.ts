@@ -121,7 +121,7 @@ test('init invokes superpowers install + MCP registrations after foodmax plugin'
       args[0] === 'plugin' &&
       args[1] === 'marketplace' &&
       args[2] === 'add' &&
-      args[3] === 'github:obra/superpowers'
+      args[3] === 'obra/superpowers'
   );
   const hasSuperpowersInstall = execCalls.some(
     ([cmd, args]) =>

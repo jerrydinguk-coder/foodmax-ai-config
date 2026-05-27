@@ -46,7 +46,9 @@ export function githubMarketplaceSource(version?: string): string {
 export const MIN_CLAUDE_CODE_VERSION = '1.0.0';
 
 // --- superpowers peer plugin ---
-export const SUPERPOWERS_SOURCE = 'github:obra/superpowers';
+// Use bare `owner/repo` shorthand. Newer Claude Code rejects the older
+// `github:owner/repo` prefix form with "Invalid marketplace source format".
+export const SUPERPOWERS_SOURCE = 'obra/superpowers';
 export const SUPERPOWERS_MARKETPLACE = 'superpowers-dev';
 export const SUPERPOWERS_PLUGIN = 'superpowers';
 

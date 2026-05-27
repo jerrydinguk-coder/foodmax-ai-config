@@ -35,7 +35,8 @@
     "CLAUDE.md",
     ".claude-plugin",
     ".locked.json",
-    "LICENSE"
+    "LICENSE",
+    "plugin.json"
   ],
   "scripts": {
     "build": "tsup",

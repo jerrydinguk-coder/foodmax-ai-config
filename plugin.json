@@ -1,0 +1,14 @@
+{
+  "name": "foodmax-ai-config",
+  "displayName": "FoodMax AI Config",
+  "description": "FoodMax team-wide AI rules, skills, and hooks",
+  "version": "1.0.0",
+  "author": {
+    "name": "FoodMax Engineering"
+  },
+  "homepage": "https://github.com/jerrydinguk-coder/foodmax-ai-config",
+  "repository": "https://github.com/jerrydinguk-coder/foodmax-ai-config",
+  "license": "MIT",
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json"
+}
