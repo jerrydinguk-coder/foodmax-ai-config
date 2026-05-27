@@ -14,10 +14,11 @@ export const SUPERPOWERS_MARKETPLACE = 'superpowers-dev';
 export const SUPERPOWERS_PLUGIN = 'superpowers';
 
 // --- Playwright MCP ---
-// Bump via: `npm view @playwright/mcp version` → update PLAYWRIGHT_MCP_PKG +
-// new release + tell users to run `npx foodmax-ai update --force-mcp`.
+// Uses @latest so users automatically pick up upstream fixes. Trade-off:
+// team members who run `init` on different days may end up on different
+// versions until one of them runs `update --force-mcp`.
 export const PLAYWRIGHT_MCP_NAME = 'playwright';
-export const PLAYWRIGHT_MCP_PKG = '@playwright/mcp@0.0.75';
+export const PLAYWRIGHT_MCP_PKG = '@playwright/mcp@latest';
 export const PLAYWRIGHT_MCP_CMD: readonly string[] = ['npx', '-y', PLAYWRIGHT_MCP_PKG];
 
 // --- Feishu MCP ---
@@ -25,10 +26,9 @@ export const PLAYWRIGHT_MCP_CMD: readonly string[] = ['npx', '-y', PLAYWRIGHT_MC
 // are NOT expanded at init time — they're read from the user's shell env
 // every time Claude Code spawns the MCP. This lets users set creds AFTER
 // running `npx foodmax-ai init`.
-// Bump lark-mcp via: `npm view @larksuiteoapi/lark-mcp version` → update
-// FEISHU_MCP_PKG + new release + tell users to run `npx foodmax-ai update --force-mcp`.
+// Same @latest trade-off as Playwright MCP above.
 export const FEISHU_MCP_NAME = 'feishu';
-export const FEISHU_MCP_PKG = '@larksuiteoapi/lark-mcp@0.5.1';
+export const FEISHU_MCP_PKG = '@larksuiteoapi/lark-mcp@latest';
 export const FEISHU_MCP_SHELL_CMD =
   `npx -y ${FEISHU_MCP_PKG} mcp -a "$LARK_APP_ID" -s "$LARK_APP_SECRET" --domain https://open.feishu.cn`;
 

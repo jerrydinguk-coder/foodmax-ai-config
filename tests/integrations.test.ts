@@ -69,21 +69,15 @@ test('registerPlaywrightMcp: registers when absent (eager-installs pkg first, th
   expect(r.status).toBe('installed');
   expect(calls).toHaveLength(2);
 
-  // 1. npm install -g @playwright/mcp@<pinned> — runs FIRST so the package is
+  // 1. npm install -g @playwright/mcp@latest — runs FIRST so the package is
   //    materialized on disk before Claude spawns the MCP for the first time.
-  const [installCmd, installArgs] = calls[0]!;
-  expect(installCmd).toBe('npm');
-  expect(installArgs[0]).toBe('install');
-  expect(installArgs[1]).toBe('-g');
-  expect(installArgs[2]).toMatch(/^@playwright\/mcp@\d+\.\d+\.\d+$/);
+  expect(calls[0]).toEqual(['npm', ['install', '-g', '@playwright/mcp@latest']]);
 
-  // 2. claude mcp add ... (regex-based version match so bumps don't churn)
-  const [addCmd, addArgs] = calls[1]!;
-  expect(addCmd).toBe('claude');
-  expect(addArgs.slice(0, 8)).toEqual([
-    'mcp', 'add', 'playwright', '--scope', 'user', '--', 'npx', '-y',
+  // 2. claude mcp add playwright --scope user -- npx -y @playwright/mcp@latest
+  expect(calls[1]).toEqual([
+    'claude',
+    ['mcp', 'add', 'playwright', '--scope', 'user', '--', 'npx', '-y', '@playwright/mcp@latest'],
   ]);
-  expect(addArgs[8]).toMatch(/^@playwright\/mcp@\d+\.\d+\.\d+$/);
 });
 
 test('registerPlaywrightMcp: still eager-installs pkg even when MCP already registered', async () => {
@@ -139,12 +133,8 @@ test('registerFeishuMcp: registers when absent (eager-installs lark-mcp first, t
   expect(r.status).toBe('installed');
   expect(calls).toHaveLength(2);
 
-  // 1. npm install -g @larksuiteoapi/lark-mcp@<pinned>
-  const [installCmd, installArgs] = calls[0]!;
-  expect(installCmd).toBe('npm');
-  expect(installArgs[0]).toBe('install');
-  expect(installArgs[1]).toBe('-g');
-  expect(installArgs[2]).toMatch(/^@larksuiteoapi\/lark-mcp@\d+\.\d+\.\d+$/);
+  // 1. npm install -g @larksuiteoapi/lark-mcp@latest
+  expect(calls[0]).toEqual(['npm', ['install', '-g', '@larksuiteoapi/lark-mcp@latest']]);
 
   // 2. claude mcp add feishu --scope user -- sh -c '<shell with $env placeholders>'
   const [addCmd, addArgs] = calls[1]!;
@@ -154,7 +144,7 @@ test('registerFeishuMcp: registers when absent (eager-installs lark-mcp first, t
   const shellCmd = addArgs[addArgs.length - 1]!;
   expect(shellCmd).toContain('$LARK_APP_ID');
   expect(shellCmd).toContain('$LARK_APP_SECRET');
-  expect(shellCmd).toMatch(/@larksuiteoapi\/lark-mcp@\d+\.\d+\.\d+/);
+  expect(shellCmd).toContain('@larksuiteoapi/lark-mcp@latest');
 });
 
 test('registerFeishuMcp: still eager-installs lark-mcp even when MCP already registered', async () => {
