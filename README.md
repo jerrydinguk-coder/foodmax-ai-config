@@ -31,7 +31,7 @@ git ls-remote https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/ko
 在你的项目根目录（例如 `~/CodeBuddy/foodmax-backend/`）执行：
 
 ```bash
-npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git#v0.2.1 init
+npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git#v0.3.0 init
 ```
 
 这一条命令做了所有事：npx 把 bootstrapper 从 Codeup 拉下来 → init 检测到项目里还没装 `foodmax-ai-config`、自动跑 `npm install --no-save` 把它装到你的 `node_modules/` → 写项目内文件、注册 plugin、装 MCP。
@@ -197,7 +197,7 @@ echo 'export LARK_APP_SECRET=xxxxx' >> ~/.zshrc
 
 | 现象 | 解 |
 |---|---|
-| `npm install ... .git` / `npx ... init` 卡住、`ETIMEDOUT` | Codeup auth 没就绪 — 任选其一：<br>① 浏览器登录一次 Codeup（macOS 会写到 keychain）<br>② 带 PAT：`https://<user>:<token>@bgs2026-ap-southeast-1.devops.alibabacloudcs.com/...`<br>③ 换 SSH URL：`git+ssh://bgs2026@bgs2026-ap-southeast-1.devops.alibabacloudcs.com:codeup/kos/dev-tools/foodmax-ai-config-init.git#v0.2.1` |
+| `npm install ... .git` / `npx ... init` 卡住、`ETIMEDOUT` | Codeup auth 没就绪 — 任选其一：<br>① 浏览器登录一次 Codeup（macOS 会写到 keychain）<br>② 带 PAT：`https://<user>:<token>@bgs2026-ap-southeast-1.devops.alibabacloudcs.com/...`<br>③ 换 SSH URL：`git+ssh://bgs2026@bgs2026-ap-southeast-1.devops.alibabacloudcs.com:codeup/kos/dev-tools/foodmax-ai-config-init.git#v0.3.0` |
 | `claude: command not found` | 装 [Claude Code](https://claude.com/claude-code) |
 | `Installed package not found at .../node_modules/foodmax-ai-config even after \`npm install...\`` | init 已经尝试自动安装但失败，多半是 Codeup auth 没就绪 — 跑 `git ls-remote <url>` 验证你能 clone，然后重跑 init |
 | `Claude Code X.Y.Z does not satisfy required range >=1.0.0` | 升级 Claude Code |
