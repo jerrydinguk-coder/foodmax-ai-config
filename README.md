@@ -76,11 +76,13 @@ claude plugin install foodmax-ai-config@foodmax-ai-config --scope user
 | 集成 | 命令 | 已装时 |
 |---|---|---|
 | superpowers plugin | `claude plugin install superpowers@superpowers-dev --scope user` | 不检测，直接重跑（Claude 自己去重）|
-| Playwright MCP | `claude mcp add playwright --scope user -- npx -y @playwright/mcp@latest` | `claude mcp list` 看到则跳过 |
-| Feishu MCP | `claude mcp add feishu --scope user -- sh -c '...lark-mcp...'` | `claude mcp list` 看到则跳过 |
+| Playwright MCP | `npm install -g @playwright/mcp@latest` + `claude mcp add playwright --scope user -- npx -y @playwright/mcp@latest` | npm install **总是**重跑（保证包在盘上）；claude mcp add 在 `claude mcp list` 已有 `playwright` 时跳过 |
+| Feishu MCP | `npm install -g @larksuiteoapi/lark-mcp@latest` + `claude mcp add feishu --scope user -- sh -c '...lark-mcp...'` | npm install **总是**重跑；claude mcp add 在 `claude mcp list` 已有 `feishu` 时跳过 |
 | `@larksuite/cli` | `npm install -g @larksuite/cli` | `which lark-cli` 看到则跳过 |
 
-被跳过的 MCP 如果是别人的版本而不是团队版，跑 `npx foodmax-ai update --force-mcp` 强制重装。
+> 两个 MCP 的 `npm install -g` 即使 claude 那边已注册也会重跑 — 目的是保证全局 node_modules 里有这个包，让 Claude 第一次 spawn MCP 时不用临时下载、离线也能用。
+>
+> 被跳过的 claude mcp 注册如果是别人的版本而不是团队版（比如命令行参数不同），跑 `npx foodmax-ai update --force-mcp` 强制重装。
 
 ### D. 自带的 10 个预装 Skill
 
