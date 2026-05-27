@@ -225,29 +225,46 @@ git push origin feat/new-thing
 - **`.husky/commit-msg`** 跑 commitlint：只允许 `feat | fix | docs | chore | refactor | test | perf | build | ci`，header ≤ 100 char。`subject-case` 和 `subject-full-stop` 已关（允许中文标点和专有名词）。
 - **`.husky/pre-push`** 强制：非-`main` 分支的 push 必须在 commit range 里包含 `.changeset/*.md`（不算 `README.md`），除非 commit message 含 `[skip-changeset]`（仅限纯 docs / test / ci 改动）。
 
-### 一次性 setup（首次发 v1.0.0 之前做一次）
+### 一次性 setup（已完成，新维护者接手时参考）
 
 1. **建 GitHub public repo** `jerrydinguk-coder/foodmax-ai-config`（empty，不要 init README/license/.gitignore）。
-2. **加 github remote 到本地** Codeup repo：
+2. **加 github remote 到本地** Codeup repo（HTTPS 走 macOS Keychain 缓存，比 SSH 少踩坑）：
    ```bash
-   git remote add github git@github.com:jerrydinguk-coder/foodmax-ai-config.git
+   git remote add github https://github.com/jerrydinguk-coder/foodmax-ai-config.git
    git push -u github main
    git push github --tags
    ```
-3. **npm 账号**：`npm login`（用你的 npm 账号；包名 `foodmax-ai-config` 会归在你 npm 账号下）。
+3. **npm 账号**：`npm login`（用你的 npm 账号；包名 `foodmax-ai-config` 归在你 npm 账号下）。
+4. **2FA + granular token**：npm 现在强制 publish 走 2FA，要让 `pnpm release` 的 `npm publish` 非交互成功：
+   - 在 npm 网页开 2FA（Authenticator app / Security key / Passkey 任一都行，过程中遇到 macOS Passkey 弹窗别取消、跟着走完）
+   - 创建 **Granular Access Token** at `https://www.npmjs.com/settings/<your-username>/tokens/new`：选 "Read and write" + 勾 **"Bypass 2FA when publishing"** + 选 `foodmax-ai-config`（或 "All packages"）
+   - 把 token 写入 `~/.npmrc`：
+     ```bash
+     echo "//registry.npmjs.org/:_authToken=npm_xxxxx" >> ~/.npmrc
+     ```
+
+### Plugin 内部结构（v1.0.1+ 必须遵守）
+
+Claude Code 对 plugin 文件结构有 schema 校验，乱写会让 `claude plugin install` 报 `source type not supported`：
+
+- `.claude-plugin/marketplace.json` — marketplace 元数据。**不要**在这里写 `hooks` / `skills` 这些 plugin-level 字段。plugin entry 的 `source` 必须是 `"./"`（注意尾部斜杠，不是 `"."`）。
+- `plugin.json`（包根）— plugin manifest。声明 `name` / `version` / `skills: "./skills/"` / `hooks: "./hooks/hooks.json"`。
+- `hooks/hooks.json` — 实际 hook 命令。schema 是 `{ "hooks": { "<EventName>": [{ "matcher": "...", "hooks": [{ "type": "command", "command": "...", "async": ... }] }] } }`。command 里用 `${CLAUDE_PLUGIN_ROOT}` 引用 plugin 根。
+- skills 内容在 `skills/` 目录，自动被 plugin manifest 引用。
 
 ### Cut a release
 
 ```bash
 pnpm pre-release           # 7 个 gate：working-tree + typecheck + test + build + lockfile + audit + npm-login
-pnpm version-packages      # 跑 changeset version → bump package.json + marketplace.json + CHANGELOG → commit + push main
+pnpm version-packages      # 跑 changeset version → bump package.json + marketplace.json + plugin.json + CHANGELOG → commit + push main
 pnpm release               # git tag vX.Y.Z + push tag 到 origin (Codeup) + push main+tag 到 github + npm publish
 ```
 
 注意：
 
 - **npm publish 是不可逆的**（72 小时窗口内能 unpublish，但会留下"卡位"防止重发同版本号）— pre-release 7 个 gate 是为这个不可逆操作准备的。
-- `pnpm version-packages` 顺带同步 `.claude-plugin/marketplace.json` 里的 `plugins[0].version`。
+- `pnpm version-packages` 同步**三个**版本号到一致：`package.json` + `.claude-plugin/marketplace.json`（plugins[0].version）+ `plugin.json`（Claude 从这里读 "Version" 显示）。任何一个 stale 都会让 `claude plugin list` 显示错版本号。
+- **如果 `pnpm release` 在 `npm publish` 步报 403**：`~/.npmrc` 里的 granular token 失效 / 过期 / 不带 Bypass 2FA。临时跑可用：`npm publish "--//registry.npmjs.org/:_authToken=npm_xxx"`。
 - **Release 目前完全手动** — Codeup Flow CI 还没接入，所有自动化脚本本身都跑得通，只缺 trigger。
 
 ### 改了 MCP 注册参数
