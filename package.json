@@ -2,6 +2,26 @@
   "name": "foodmax-ai-config",
   "version": "0.3.0",
   "description": "FoodMax team-wide AI assistant configuration (Claude Code plugin + npm CLI)",
+  "license": "MIT",
+  "homepage": "https://github.com/jerrydinguk-coder/foodmax-ai-config",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jerrydinguk-coder/foodmax-ai-config.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jerrydinguk-coder/foodmax-ai-config/issues"
+  },
+  "keywords": [
+    "claude-code",
+    "claude-code-plugin",
+    "mcp",
+    "ai-assistant",
+    "team-config",
+    "foodmax"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "bin": {
     "foodmax-ai": "./dist/cli.js"
@@ -14,7 +34,8 @@
     "agents",
     "CLAUDE.md",
     ".claude-plugin",
-    ".locked.json"
+    ".locked.json",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsup",

@@ -10,9 +10,7 @@ import {
   projectLockfileName,
 } from '../lib/paths.js';
 import { ok, warn, fail, info, dim } from '../lib/log.js';
-import { FOODMAX_SOURCE as SOURCE } from '../lib/constants.js';
-
-const PACKAGE_NAME = 'foodmax-ai-config';
+import { FOODMAX_NPM_PACKAGE as PACKAGE_NAME, npmInstallSpec } from '../lib/constants.js';
 
 export interface RunVerifyOptions {
   cwd: string;
@@ -31,11 +29,11 @@ export async function runVerify(opts: RunVerifyOptions): Promise<VerifyOutcome> 
   const projectLockPath = join(opts.cwd, projectLockfileName());
 
   if (!existsSync(pkgRoot) || !existsSync(join(pkgRoot, 'package.json'))) {
-    console.error(fail(`Package ${PACKAGE_NAME} not installed. Run: npx -y ${SOURCE} init`));
+    console.error(fail(`Package ${PACKAGE_NAME} not installed. Run: npx -y ${npmInstallSpec()} init`));
     return { ok: false, exitCode: 2, driftedFiles: [] };
   }
   if (!existsSync(projectLockPath)) {
-    console.error(fail(`${projectLockfileName()} not found. Run: npx -y ${SOURCE} init`));
+    console.error(fail(`${projectLockfileName()} not found. Run: npx -y ${npmInstallSpec()} init`));
     return { ok: false, exitCode: 2, driftedFiles: [] };
   }
   const internalLockPath = join(pkgRoot, packageLockfileName());

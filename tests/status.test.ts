@@ -5,16 +5,6 @@ import { runStatus } from '../src/commands/status.js';
 import { runInit } from '../src/commands/init.js';
 import { makeTempProject, makeFakeInstalledPackage } from './helpers/tempProject.js';
 import { generateLockfile } from '../src/lib/lockfile.js';
-import type { VersionsJson } from '../src/lib/versions.js';
-
-const fakeVersionsJson: VersionsJson = {
-  schemaVersion: 1,
-  channels: { latest: { version: '1.0.0', tag: 'v1.0.0', publishedAt: '2026-01-01T00:00:00Z' } },
-  deprecated: [],
-  minSupportedVersion: '1.0.0',
-  peerRequirements: { claudeCode: '>=1.0.0', node: '>=18.0.0' },
-};
-const fakeFetchVersions = async () => fakeVersionsJson;
 
 let project: ReturnType<typeof makeTempProject>;
 let pkgRoot: string;
@@ -31,7 +21,8 @@ beforeEach(async () => {
     packageRootOverride: pkgRoot,
     exec: async () => ({ stdout: '', stderr: '' }),
     claudeDetect: async () => ({ ok: true as const, version: '1.0.0' }),
-    fetchVersions: fakeFetchVersions,
+    larkCliPresent: async () => true,
+    listMcpNames: async () => [],
     yes: true,
   });
 });

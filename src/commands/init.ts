@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { valid as semverValid } from 'semver';
 import { readLockfile, type ProjectLockfile } from '../lib/lockfile.js';
 import { packageLockfileName, projectLockfileName } from '../lib/paths.js';
 import { detectClaudeCli, requireClaudeVersion, type DetectResult } from '../lib/claude-detect.js';
@@ -13,17 +14,13 @@ import { PROJECT_CLAUDE_MD_BLOCK } from '../templates/project-claude-md.js';
 import { CI_WORKFLOW_YAML } from '../templates/ci-workflow.js';
 import { ok, warn, fail, info, bold } from '../lib/log.js';
 import {
-  FOODMAX_PACKAGE as PACKAGE_NAME,
-  FOODMAX_SOURCE as SOURCE,
+  FOODMAX_NPM_PACKAGE as PACKAGE_NAME,
   FOODMAX_MARKETPLACE as MARKETPLACE_NAME,
   FOODMAX_PLUGIN as PLUGIN_NAME,
+  MIN_CLAUDE_CODE_VERSION,
+  npmInstallSpec,
+  githubMarketplaceSource,
 } from '../lib/constants.js';
-import {
-  fetchVersions as defaultFetchVersions,
-  resolveVersion,
-  type VersionsJson,
-} from '../lib/versions.js';
-import { warnIfDeprecated, requireNotBlocked } from '../lib/deprecation.js';
 
 const _exec = promisify(execFile);
 
@@ -39,12 +36,10 @@ export interface RunInitOptions {
   larkCliPresent?: () => Promise<boolean>;
   /** Inject for tests so init does not run real `claude mcp list`. */
   listMcpNames?: () => Promise<string[]>;
-  /** Pin to a specific semver. Mutually exclusive with channel. */
+  /** Pin to a specific semver. Mutually exclusive with tag. */
   version?: string;
-  /** Pick a channel from versions.json (default: latest). Mutually exclusive with version. */
-  channel?: string;
-  /** Inject for tests: avoid network/git. */
-  fetchVersions?: () => Promise<VersionsJson>;
+  /** Pick an npm dist-tag (default: latest). Mutually exclusive with version. */
+  tag?: string;
 }
 
 export async function runInit(opts: RunInitOptions): Promise<void> {
@@ -68,19 +63,21 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
     throw new Error(`Node 18+ required (you have ${process.versions.node})`);
   }
 
-  // Fetch versions metadata + check peer requirements + resolve target tag
-  const fetchV = opts.fetchVersions ?? (() => defaultFetchVersions());
-  const versionsJson = await fetchV();
-
-  const claudeReq = requireClaudeVersion(claudeR, versionsJson.peerRequirements.claudeCode);
+  const claudeReq = requireClaudeVersion(claudeR, `>=${MIN_CLAUDE_CODE_VERSION}`);
   if (!claudeReq.ok) {
     throw new Error(claudeReq.reason);
   }
 
-  const resolved = resolveVersion(versionsJson, { version: opts.version, channel: opts.channel });
-  const pinnedSource = `${SOURCE}#${resolved.tag}`;
-  warnIfDeprecated(versionsJson, resolved.version);
-  requireNotBlocked(versionsJson, resolved.version);
+  // Resolve the target the user asked for. Both branches produce an npm spec
+  // suitable for `npm install --no-save`.
+  if (opts.version && opts.tag) {
+    throw new Error('--version and --tag are mutually exclusive');
+  }
+  if (opts.version && !semverValid(opts.version)) {
+    throw new Error(`--version must be a valid semver (got "${opts.version}")`);
+  }
+  const targetSpecifier = opts.version ?? opts.tag ?? 'latest';
+  const npmTarget = npmInstallSpec(targetSpecifier);
 
   const pkgRoot = opts.packageRootOverride ?? join(opts.cwd, 'node_modules', PACKAGE_NAME);
   const pkgInstalled = existsSync(join(pkgRoot, 'package.json'));
@@ -88,29 +85,29 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
   if (opts.dryRun) {
     console.log(info(bold('[dry-run] Would perform:')));
     if (!pkgInstalled) {
-      console.log(info(`  - Run: npm install --no-save ${pinnedSource}`));
+      console.log(info(`  - Run: npm install --no-save ${npmTarget}`));
     }
     console.log(info(`  - Merge ${join(opts.cwd, 'CLAUDE.md')} with team region`));
     console.log(info(`  - Add devDep "${PACKAGE_NAME}" to package.json`));
     console.log(info(`  - Append .gitignore`));
     console.log(info(`  - Write .github/workflows/ai-config-verify.yml`));
-    console.log(info(`  - Run: claude plugin marketplace add ${SOURCE}`));
+    console.log(info(`  - Run: claude plugin marketplace add ${githubMarketplaceSource()} (pinned to installed version's tag)`));
     console.log(info(`  - Run: claude plugin install ${PLUGIN_NAME}@${MARKETPLACE_NAME} --scope user`));
     console.log(info(`  - Write ${projectLockfileName()}`));
     return;
   }
 
   if (!pkgInstalled) {
-    console.log(info(`Package not in node_modules; installing ${pinnedSource}…`));
+    console.log(info(`Package not in node_modules; installing ${npmTarget}…`));
     try {
-      await exec('npm', ['install', '--no-save', pinnedSource]);
+      await exec('npm', ['install', '--no-save', npmTarget]);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      throw new Error(`npm install --no-save ${pinnedSource} failed: ${msg}`);
+      throw new Error(`npm install --no-save ${npmTarget} failed: ${msg}`);
     }
     if (!existsSync(join(pkgRoot, 'package.json'))) {
       throw new Error(
-        `Installed package not found at ${pkgRoot} even after \`npm install --no-save ${pinnedSource}\`. Check that you can reach Codeup (\`git ls-remote ${SOURCE}\`).`
+        `Installed package not found at ${pkgRoot} even after \`npm install --no-save ${npmTarget}\`. Check that you can reach the npm registry.`
       );
     }
   }
@@ -122,15 +119,21 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
   }
   const internalLock = readLockfile(internalLockPath);
 
+  // Read the resolved version so we can pin the GitHub marketplace tag + write
+  // an accurate semver to project package.json + the project lockfile.
+  const installedVersion = readPackageVersion(pkgRoot);
+  const githubSource = githubMarketplaceSource(installedVersion);
+
   // Step 1: project files
   writeProjectClaudeMd(opts.cwd);
-  writeProjectPackageJson(opts.cwd, pinnedSource);
+  writeProjectPackageJson(opts.cwd, installedVersion);
   writeProjectGitignore(opts.cwd);
   writeProjectCiWorkflow(opts.cwd);
 
-  // Step 2: plugin install (the critical one)
+  // Step 2: plugin install — marketplace is the GitHub mirror (anonymous-readable),
+  // plugin install drops a copy into ~/.claude/plugins/ at user scope.
   const installR = await installPlugin({
-    source: pinnedSource,
+    source: githubSource,
     marketplaceName: MARKETPLACE_NAME,
     pluginName: PLUGIN_NAME,
     scope: 'user',
@@ -138,7 +141,7 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
   });
   if (!installR.ok) {
     console.log(warn(`Plugin install reported a non-fatal error: ${installR.error}`));
-    console.log(warn(`You may need to run manually: claude plugin marketplace add ${SOURCE}`));
+    console.log(warn(`You may need to run manually: claude plugin marketplace add ${githubSource}`));
   } else {
     console.log(ok('Claude plugin installed (scope=user)'));
   }
@@ -164,18 +167,17 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
 
   // Step 3: project lockfile
   const commitSha = await tryReadInstalledCommitSha(pkgRoot);
-  const pkgVersion = readPackageVersion(pkgRoot);
   const projectLock: ProjectLockfile = {
     version: 1,
     package: PACKAGE_NAME,
-    source: SOURCE,
+    source: PACKAGE_NAME,
     commitSha,
-    packageVersion: pkgVersion,
+    packageVersion: installedVersion,
     packageRootHash: internalLock.rootHash,
     initializedAt: new Date().toISOString(),
-    initializedBy: `foodmax-ai@${pkgVersion}`,
-    ...(resolved.source === 'channel' ? { channel: resolved.channel } : {}),
-    resolvedFrom: resolved.source,
+    initializedBy: `foodmax-ai@${installedVersion}`,
+    ...(opts.version ? {} : { channel: opts.tag ?? 'latest' }),
+    resolvedFrom: opts.version ? 'explicit-version' : 'channel',
   };
   writeFileSync(
     join(opts.cwd, projectLockfileName()),
@@ -205,7 +207,7 @@ function writeProjectClaudeMd(cwd: string): void {
   console.log(ok(`Wrote ${path} (team region merged)`));
 }
 
-function writeProjectPackageJson(cwd: string, depUrl: string): void {
+function writeProjectPackageJson(cwd: string, installedVersion: string): void {
   const path = join(cwd, 'package.json');
   if (!existsSync(path)) {
     console.log(warn(`No package.json at ${path}; skipping devDep insert.`));
@@ -217,7 +219,7 @@ function writeProjectPackageJson(cwd: string, depUrl: string): void {
     console.log(info(`package.json devDependencies["${PACKAGE_NAME}"] already set; leaving it`));
     return;
   }
-  pkg.devDependencies[PACKAGE_NAME] = depUrl;
+  pkg.devDependencies[PACKAGE_NAME] = `^${installedVersion}`;
   writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
   console.log(ok(`Updated package.json devDependencies["${PACKAGE_NAME}"]`));
 }
@@ -263,8 +265,8 @@ export function registerInit(program: Command): void {
     .description('Bootstrap this project with foodmax-ai-config')
     .option('--dry-run', 'Print what would happen, do not write')
     .option('--yes', 'Skip interactive confirmations')
-    .option('--version <semver>', 'Pin to a specific version (e.g., 1.2.3). Mutually exclusive with --channel')
-    .option('--channel <name>', 'Pick a channel from versions.json (default: latest)')
+    .option('--version <semver>', 'Pin to a specific version (e.g., 1.2.3). Mutually exclusive with --tag')
+    .option('--tag <name>', 'Pick an npm dist-tag (default: latest). Mutually exclusive with --version')
     .action(async (opts) => {
       try {
         await runInit({
@@ -272,7 +274,7 @@ export function registerInit(program: Command): void {
           yes: opts.yes,
           dryRun: opts.dryRun,
           version: opts.version,
-          channel: opts.channel,
+          tag: opts.tag,
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

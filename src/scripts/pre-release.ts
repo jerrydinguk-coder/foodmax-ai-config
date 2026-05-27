@@ -12,6 +12,8 @@ export interface PreReleaseDeps {
   checkLockfileDrift: () => Promise<CheckResult>;
   runAudit: () => Promise<CheckResult>;
   checkWorkingTreeClean: () => Promise<CheckResult>;
+  /** Verifies that `npm whoami` succeeds — required for `npm publish` later. */
+  checkNpmLoggedIn: () => Promise<CheckResult>;
 }
 
 export interface RunPreReleaseResult {
@@ -82,6 +84,16 @@ export const defaultDeps: PreReleaseDeps = {
       return { ok: false, reason: extractErrorMessage(e) };
     }
   },
+  checkNpmLoggedIn: async () => {
+    try {
+      const { stdout } = await execFileAsync('npm', ['whoami'], { timeout: 10_000 });
+      const user = stdout.trim();
+      if (!user) return { ok: false, reason: 'npm whoami returned empty — run `npm login`' };
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, reason: `npm whoami failed — run \`npm login\`: ${extractErrorMessage(e).slice(0, 200)}` };
+    }
+  },
 };
 
 export async function runPreRelease(deps: PreReleaseDeps = defaultDeps): Promise<RunPreReleaseResult> {
@@ -92,6 +104,7 @@ export async function runPreRelease(deps: PreReleaseDeps = defaultDeps): Promise
     { name: 'build', run: deps.runBuild },
     { name: 'lockfile', run: deps.checkLockfileDrift },
     { name: 'audit', run: deps.runAudit },
+    { name: 'npm-login', run: deps.checkNpmLoggedIn },
   ];
 
   const failures: Array<{ check: string; reason: string }> = [];

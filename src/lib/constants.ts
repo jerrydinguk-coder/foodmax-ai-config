@@ -2,11 +2,48 @@
 // Single source of truth so a rename / rebrand is one edit.
 
 // --- foodmax-ai-config plugin itself ---
+// The package is distributed through TWO channels:
+//   (1) npm public registry — `npm install foodmax-ai-config@<version>` ships
+//       the CLI + skills + hooks (zero-auth pull from registry.npmjs.org).
+//   (2) GitHub public mirror — used by Claude Code as the plugin marketplace
+//       catalog (`claude plugin marketplace add <github URL>#v<version>`).
+// The repo on Codeup remains the source of truth for development; release
+// publishes to npm AND mirrors to GitHub.
 export const FOODMAX_PACKAGE = 'foodmax-ai-config';
-export const FOODMAX_SOURCE =
-  'https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git';
+export const FOODMAX_NPM_PACKAGE = 'foodmax-ai-config';
+export const FOODMAX_GITHUB_OWNER = 'jerrydinguk-coder';
+export const FOODMAX_GITHUB_REPO = 'foodmax-ai-config';
+export const FOODMAX_GITHUB_SOURCE = `https://github.com/${FOODMAX_GITHUB_OWNER}/${FOODMAX_GITHUB_REPO}.git`;
 export const FOODMAX_MARKETPLACE = 'foodmax-ai-config';
 export const FOODMAX_PLUGIN = 'foodmax-ai-config';
+
+/**
+ * npm install spec for the foodmax-ai-config package.
+ * Examples:
+ *   npmInstallSpec('1.0.0')   → 'foodmax-ai-config@1.0.0'
+ *   npmInstallSpec('latest')  → 'foodmax-ai-config@latest'
+ *   npmInstallSpec()          → 'foodmax-ai-config@latest'
+ */
+export function npmInstallSpec(versionOrTag?: string): string {
+  return `${FOODMAX_NPM_PACKAGE}@${versionOrTag ?? 'latest'}`;
+}
+
+/**
+ * GitHub marketplace URL for `claude plugin marketplace add`.
+ * Examples:
+ *   githubMarketplaceSource('1.0.0') → 'https://github.com/.../foodmax-ai-config.git#v1.0.0'
+ *   githubMarketplaceSource()        → 'https://github.com/.../foodmax-ai-config.git' (default branch)
+ */
+export function githubMarketplaceSource(version?: string): string {
+  return version ? `${FOODMAX_GITHUB_SOURCE}#v${version}` : FOODMAX_GITHUB_SOURCE;
+}
+
+/**
+ * Minimum Claude Code version this release supports. Checked at the start of
+ * init/update. Bump this when we adopt a CLI feature that older versions don't
+ * have (e.g., a new plugin source type, a new mcp flag).
+ */
+export const MIN_CLAUDE_CODE_VERSION = '1.0.0';
 
 // --- superpowers peer plugin ---
 export const SUPERPOWERS_SOURCE = 'github:obra/superpowers';

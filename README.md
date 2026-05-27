@@ -2,7 +2,7 @@
 
 > FoodMax 团队 AI 助手统一配置 — 既是 **Claude Code plugin**（团队 skills、hooks、CLAUDE.md），也是 **CLI 工具**（lockfile 锁版本、drift 检测、CI 守门）。
 
-一组命令把团队规则、Claude Code skills、MCP 集成铺到你的开发环境，并由 lockfile 保证大家用的是同一份。
+通过 npm 公开 registry 分发，**同事完全零配置一行命令安装**。
 
 ---
 
@@ -14,29 +14,26 @@
 |---|---|---|
 | [Claude Code](https://claude.com/claude-code) | `>=1.0.0` | init 启动时校验，不满足直接报错 |
 | Node | `>=18` | init 启动时校验 |
-| Git | 任意 | 必须能 clone Codeup 私有 repo — 见下方 |
+| Git | 任意 | 初始化项目用 |
 
-### 关于 Codeup 认证
-
-这个包**不发布到任何 npm registry**，所有分发都通过 Codeup git URL 直接 clone。所以每台用 `foodmax-ai` 的机器都需要先能访问下面这个 repo：
-
-```bash
-git ls-remote https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git
-```
-
-如果这条挂住或报 `ETIMEDOUT`，说明 git auth 没就绪 — 见本文末尾 Troubleshooting 章节第一行。
+> 同事**不需要任何**账号配置：不需要 npm login，不需要 GitHub 账号，不需要 Codeup 权限。npm 公共 registry 匿名下载、GitHub public repo 匿名拉 marketplace 都是零认证路径。
 
 ### 安装
 
 在你的项目根目录（例如 `~/CodeBuddy/foodmax-backend/`）执行：
 
 ```bash
-npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init.git#v0.3.0 init
+npx -y foodmax-ai-config@latest init
 ```
 
-这一条命令做了所有事：npx 把 bootstrapper 从 Codeup 拉下来 → init 检测到项目里还没装 `foodmax-ai-config`、自动跑 `npm install --no-save` 把它装到你的 `node_modules/` → 写项目内文件、注册 plugin、装 MCP。
+这一条命令做了所有事：
 
-> 当前各 channel 的版本号见 [versions.json](versions.json)。想跟踪团队 `latest` channel（README 偶尔滞后），init 完之后跑一次 `npx foodmax-ai update`。
+1. npx 临时拉 bootstrapper 跑起来
+2. init 自动 `npm install --no-save foodmax-ai-config@latest` 把包装到你 `node_modules/`
+3. 写项目内文件（CLAUDE.md / package.json / .gitignore / CI workflow / lockfile）
+4. `claude plugin marketplace add https://github.com/jerrydinguk-coder/foodmax-ai-config.git#v<X.Y.Z>` 注册到 Claude（GitHub public，匿名访问）
+5. `claude plugin install foodmax-ai-config@foodmax-ai-config --scope user` 装到用户级
+6. 注册 Playwright MCP / Feishu MCP / 装 lark-cli（best-effort）
 
 ### init 跑完后必做 3 件事
 
@@ -53,21 +50,19 @@ npx -y https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-t
 | 路径 | 行为 | 重跑 init |
 |---|---|---|
 | `CLAUDE.md` | 在 `<!-- BEGIN/END foodmax-ai -->` 之间插入团队规则 | 覆写标记内，标记外不动 |
-| `package.json` | 加 `devDependencies["foodmax-ai-config"] = "<url>#vX.Y.Z"` | 已有该 key 则不动（不会自动升 version）|
+| `package.json` | 加 `devDependencies["foodmax-ai-config"] = "^X.Y.Z"`（npm semver caret 范围） | 已有该 key 则不动 |
 | `.gitignore` | 追加 `.claude/settings.local.json` | 已有该行则跳过 |
 | `.github/workflows/ai-config-verify.yml` | 写入 GitHub Actions CI 工作流 | 文件已存在则跳过 |
-| `.foodmax-ai.lock.json` | 记录 `packageVersion` + `commitSha` + `packageRootHash` + `initializedAt` | 每次重写 |
-
-> CI workflow 钉的是 bootstrapper repo 的 `#main` 分支，**不是**你 init 时的 tag — CI 验证会随 bootstrapper main 漂移。
+| `.foodmax-ai.lock.json` | 记录 `packageVersion` + `packageRootHash` + `initializedAt` + `channel`（npm dist-tag）| 每次重写 |
 
 ### B. 注册 foodmax-ai-config plugin 到 Claude Code
 
 ```
-claude plugin marketplace add <Codeup URL>#<tag>
+claude plugin marketplace add https://github.com/jerrydinguk-coder/foodmax-ai-config.git#v<X.Y.Z>
 claude plugin install foodmax-ai-config@foodmax-ai-config --scope user
 ```
 
-这一步装的就是本仓库 — 它带来下方 § D 列出的 10 个预装 skill。失败只打 ⚠ 警告，不会中断 init。
+`<X.Y.Z>` 是 init 时刚装到 `node_modules/foodmax-ai-config/` 的实际版本（保证 plugin 内容 = npm 包内容 = GitHub tag 内容）。失败只打 ⚠ 警告，不会中断 init。
 
 ### C. 全局 4 项 best-effort 集成
 
@@ -76,13 +71,13 @@ claude plugin install foodmax-ai-config@foodmax-ai-config --scope user
 | 集成 | 命令 | 已装时 |
 |---|---|---|
 | superpowers plugin | `claude plugin install superpowers@superpowers-dev --scope user` | 不检测，直接重跑（Claude 自己去重）|
-| Playwright MCP | `npm install -g @playwright/mcp@latest` + `claude mcp add playwright --scope user -- npx -y @playwright/mcp@latest` | npm install **总是**重跑（保证包在盘上）；claude mcp add 在 `claude mcp list` 已有 `playwright` 时跳过 |
+| Playwright MCP | `npm install -g @playwright/mcp@latest` + `claude mcp add playwright --scope user -- npx -y @playwright/mcp@latest` | npm install **总是**重跑；claude mcp add 在 `claude mcp list` 已有 `playwright` 时跳过 |
 | Feishu MCP | `npm install -g @larksuiteoapi/lark-mcp@latest` + `claude mcp add feishu --scope user -- sh -c '...lark-mcp...'` | npm install **总是**重跑；claude mcp add 在 `claude mcp list` 已有 `feishu` 时跳过 |
 | `@larksuite/cli` | `npm install -g @larksuite/cli` | `which lark-cli` 看到则跳过 |
 
-> 两个 MCP 的 `npm install -g` 即使 claude 那边已注册也会重跑 — 目的是保证全局 node_modules 里有这个包，让 Claude 第一次 spawn MCP 时不用临时下载、离线也能用。
+> 两个 MCP 的 `npm install -g` 即使 Claude 已注册也会重跑 — 目的是保证全局 node_modules 有这个包，让 Claude 第一次 spawn MCP 即时启动、离线可用。
 >
-> 被跳过的 claude mcp 注册如果是别人的版本而不是团队版（比如命令行参数不同），跑 `npx foodmax-ai update --force-mcp` 强制重装。
+> 被跳过的 claude mcp 注册如果是别人的版本而不是团队版（命令行参数不同），跑 `npx foodmax-ai update --force-mcp` 强制重装。
 
 ### D. 自带的 10 个预装 Skill
 
@@ -109,8 +104,8 @@ claude plugin install foodmax-ai-config@foodmax-ai-config --scope user
 |---|---|
 | `--dry-run` | 只打印"将执行"的动作，不写文件、不 shell out |
 | `--yes` | 跳过 "必须在 git repo 里" 这一条 preflight |
-| `--version <semver>` | pin 到具体版本（与 `--channel` 互斥）|
-| `--channel <name>` | 从 versions.json 选 channel（默认 `latest`）|
+| `--version <semver>` | pin 到具体版本（如 `1.0.0`），与 `--tag` 互斥 |
+| `--tag <name>` | 选 npm dist-tag（默认 `latest`），与 `--version` 互斥 |
 
 ---
 
@@ -119,12 +114,13 @@ claude plugin install foodmax-ai-config@foodmax-ai-config --scope user
 ### 同步最新
 
 ```bash
-npx foodmax-ai update                  # 拉 latest channel
-npx foodmax-ai update --version 0.2.1  # pin 到具体版本
-npx foodmax-ai update --force-mcp      # 维护者通知 MCP 注册参数变了时用
+npx foodmax-ai update                # 拉 latest dist-tag
+npx foodmax-ai update --version 1.0.0  # pin 到具体版本
+npx foodmax-ai update --tag beta     # 切到 beta dist-tag
+npx foodmax-ai update --force-mcp    # 维护者通知 MCP 注册参数变了时用
 ```
 
-update 会：reinstall 包 → 刷 plugin marketplace → 重跑 4 项集成 → 重写 `.foodmax-ai.lock.json`。
+update 会：从 npm 重装包 → 刷 plugin marketplace（按新版本号同步 GitHub tag）→ 重跑 4 项集成 → 重写 `.foodmax-ai.lock.json`。
 `--force-mcp` 先 `claude mcp remove playwright feishu`，再走集成 B/C 重新注册。
 
 ### 状态查询
@@ -149,13 +145,13 @@ npx foodmax-ai verify --strict     # 有 drift exit 1（init 写出来的 CI wor
 npx foodmax-ai repair
 ```
 
-reinstall 时尊重 `.foodmax-ai.lock.json` 里的 `packageVersion`，不会偷偷把项目从 pin 拉到 main。如果项目根没有 `.foodmax-ai.lock.json`（没跑过 init），会 fallback 到 bootstrapper main。
+reinstall 时尊重 `.foodmax-ai.lock.json` 里的 `packageVersion`（用 `foodmax-ai-config@<pinned-version>` 作 npm spec），不会偷偷把项目从 pin 拉到 latest。如果项目根没有 `.foodmax-ai.lock.json`（没跑过 init），会 fallback 到 `foodmax-ai-config@latest`。
 
 ### 本地实验改 skill
 
 直接改 `node_modules/foodmax-ai-config/skills/.../SKILL.md`。本地 `verify`（不带 `--strict`）会软警告，不强拦。
 
-- 想保留 → 提 PR 到 [Codeup repo](https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init)
+- 想保留 → 提 PR 到 [GitHub repo](https://github.com/jerrydinguk-coder/foodmax-ai-config)
 - 想丢 → `npx foodmax-ai repair`
 
 ---
@@ -176,20 +172,16 @@ echo 'export LARK_APP_SECRET=xxxxx' >> ~/.zshrc
 
 ---
 
-## 版本安全
+## 版本管理
 
-`versions.json`（远端真相，init/update 时从 Codeup 拉）可以把某个版本标记成：
-
-| severity | 显示 | 行为 |
+| 机制 | 来源 | 怎么用 |
 |---|---|---|
-| `warn`（默认）| `⚠️  DEPRECATED: vX.Y.Z — <reason>. Fixed in vA.B.C.` | 命令照常执行 |
-| `block` | 同上 + 抛错 `vX.Y.Z is BLOCKED: ...` | **只对 `init` / `update` 硬拦**，要求 `update --version <fixedIn>` |
+| **npm dist-tags**（channels）| npm registry 原生 | `npx foodmax-ai update --tag latest` / `--tag beta` |
+| **npm deprecate**（warn）| `npm deprecate foodmax-ai-config@X.Y.Z "<reason>"` | 同事跑 `npm install` 时 npm 自动打 warning |
+| **`.locked.json` sha256**（drift detection）| 包内构建产物 | `npx foodmax-ai verify` 检查 |
+| **`.foodmax-ai.lock.json`**（项目 pin）| init/update 写 | `npx foodmax-ai repair` 按这里的 packageVersion 重装 |
 
-注意：
-
-- **只有 `init` 和 `update` 真硬拦**。`status` / `verify` / `repair` / `lock` 启动时会跑一个 fire-and-forget banner 检查（2 秒 timeout，要求 `.foodmax-ai.lock.json` 存在），**不会**因为 BLOCKED 中断执行。
-- **没有 bypass 机制** — 没有 env var、没有 `--force-deprecated`。绕过 BLOCKED 的唯一办法是 `--version <非 blocked 版本>` 或 `--channel <其他>`。
-- 漏洞请通过 [SECURITY.md](SECURITY.md) 私下报告，**不要**发 public issue。
+> v1 没有"硬 block"机制 — 如果某个版本必须禁用，用 `npm deprecate` 打 warning + 飞书群通知。npm 不支持强制阻止 install，但 `npm deprecate` 的 warning 在 install 输出里很显眼。
 
 ---
 
@@ -197,16 +189,16 @@ echo 'export LARK_APP_SECRET=xxxxx' >> ~/.zshrc
 
 | 现象 | 解 |
 |---|---|
-| `npm install ... .git` / `npx ... init` 卡住、`ETIMEDOUT` | Codeup auth 没就绪 — 任选其一：<br>① 浏览器登录一次 Codeup（macOS 会写到 keychain）<br>② 带 PAT：`https://<user>:<token>@bgs2026-ap-southeast-1.devops.alibabacloudcs.com/...`<br>③ 换 SSH URL：`git+ssh://bgs2026@bgs2026-ap-southeast-1.devops.alibabacloudcs.com:codeup/kos/dev-tools/foodmax-ai-config-init.git#v0.3.0` |
+| `npx foodmax-ai-config@latest init` 卡住、`ETIMEDOUT` 或 `ENOTFOUND registry.npmjs.org` | 你的网络访问不了 npm 公共 registry — 切到团队内网镜像（`npm config set registry https://...`）或检查 VPN / 代理 |
 | `claude: command not found` | 装 [Claude Code](https://claude.com/claude-code) |
-| `Installed package not found at .../node_modules/foodmax-ai-config even after \`npm install...\`` | init 已经尝试自动安装但失败，多半是 Codeup auth 没就绪 — 跑 `git ls-remote <url>` 验证你能 clone，然后重跑 init |
-| `Claude Code X.Y.Z does not satisfy required range >=1.0.0` | 升级 Claude Code |
+| `Installed package not found at .../node_modules/foodmax-ai-config even after \`npm install\`` | init 已经尝试自动安装但失败 — 跑 `npm install --no-save foodmax-ai-config@latest` 看具体错误 |
+| `Claude Code X.Y.Z does not satisfy required range >=1.0.0` | 升级 Claude Code（`claude update` 或重装）|
 | `Node 18+ required` | `nvm install 18` 或 `asdf` 切到 18+ |
 | `verify --strict` 在 CI exit 1 | 本地跑 `npx foodmax-ai status --diff` 看 drift；恢复用 `repair` |
 | Feishu MCP 全 401 | `echo $LARK_APP_ID` 是不是空；写 `~/.zshrc` 后**重启** Claude Code |
 | `lark-cli: command not found` 但 init 报已装 | `source ~/.zshrc` 或开新 terminal |
 | `MCP "X" already registered` 警告 | 本地已有同名 MCP；想换成团队版用 `update --force-mcp` |
-| `v... is BLOCKED` 报错 | 装的版本被维护者禁用；`update --version <fixedIn>` |
+| `claude plugin marketplace add` 失败访问 GitHub | 你的网络访问不了 github.com — 检查 VPN / 代理。GitHub mirror 是 marketplace 入口（不是 npm 包内容来源）|
 | `pnpm lock` 在 pre-release 失败 | 本地跑 `pnpm lock`，commit `.locked.json` |
 
 ---
@@ -233,19 +225,28 @@ git push origin feat/new-thing
 - **`.husky/commit-msg`** 跑 commitlint：只允许 `feat | fix | docs | chore | refactor | test | perf | build | ci`，header ≤ 100 char。`subject-case` 和 `subject-full-stop` 已关（允许中文标点和专有名词）。
 - **`.husky/pre-push`** 强制：非-`main` 分支的 push 必须在 commit range 里包含 `.changeset/*.md`（不算 `README.md`），除非 commit message 含 `[skip-changeset]`（仅限纯 docs / test / ci 改动）。
 
+### 一次性 setup（首次发 v1.0.0 之前做一次）
+
+1. **建 GitHub public repo** `jerrydinguk-coder/foodmax-ai-config`（empty，不要 init README/license/.gitignore）。
+2. **加 github remote 到本地** Codeup repo：
+   ```bash
+   git remote add github git@github.com:jerrydinguk-coder/foodmax-ai-config.git
+   git push -u github main
+   git push github --tags
+   ```
+3. **npm 账号**：`npm login`（用你的 npm 账号；包名 `foodmax-ai-config` 会归在你 npm 账号下）。
+
 ### Cut a release
 
-完整流程 + 漏洞响应 + rollback 见 [RELEASING.md](RELEASING.md)。简版：
-
 ```bash
-pnpm pre-release           # 6 个 gate：working-tree + typecheck + test + build + lockfile + audit
+pnpm pre-release           # 7 个 gate：working-tree + typecheck + test + build + lockfile + audit + npm-login
 pnpm version-packages      # 跑 changeset version → bump package.json + marketplace.json + CHANGELOG → commit + push main
-pnpm release               # git tag vX.Y.Z + push tag + 更新 versions.json channels.latest + commit + push main
+pnpm release               # git tag vX.Y.Z + push tag 到 origin (Codeup) + push main+tag 到 github + npm publish
 ```
 
 注意：
 
-- **不发布到任何 npm registry** — release 只打 git tag + 更新 versions.json，分发完全靠 Codeup git URL。
+- **npm publish 是不可逆的**（72 小时窗口内能 unpublish，但会留下"卡位"防止重发同版本号）— pre-release 7 个 gate 是为这个不可逆操作准备的。
 - `pnpm version-packages` 顺带同步 `.claude-plugin/marketplace.json` 里的 `plugins[0].version`。
 - **Release 目前完全手动** — Codeup Flow CI 还没接入，所有自动化脚本本身都跑得通，只缺 trigger。
 
@@ -257,20 +258,16 @@ changeset 描述里点明，release 后在团队飞书群发：
 
 ### 标记一个 release 为有问题
 
-往 `versions.json` 的 `deprecated[]` 加一条：
-
-```json
-{
-  "version": "0.2.0",
-  "reason": "MCP secret 在日志里泄漏",
-  "fixedIn": "0.2.1",
-  "deprecatedAt": "2026-05-26T00:00:00Z",
-  "severity": "block"
-}
+```bash
+npm deprecate foodmax-ai-config@1.4.2 "Critical: MCP secret leak. Use 1.4.3+"
 ```
 
-- 不写 `severity` 或 `"warn"` → 用户看到 ⚠ 但命令继续执行
-- `"block"` → `init` / `update` 直接抛错；用户必须 `update --version <fixedIn>`
+同事跑 `npm install` / `npx foodmax-ai-config@1.4.2 init` 时 npm 会打 warning：
+```
+npm WARN deprecated foodmax-ai-config@1.4.2: Critical: MCP secret leak. Use 1.4.3+
+```
+
+`npm deprecate` 不能阻止 install（npm 没这能力），但 warning 在 install 输出里很显眼。配合飞书群通知，足够覆盖 v1 安全响应需求。
 
 ---
 
@@ -279,10 +276,10 @@ changeset 描述里点明，release 后在团队飞书群发：
 明确不支持，是设计边界、不是优先级问题：
 
 - Cursor / Codex 集成
-- 数字签名 / GPG（信任边界是 Codeup repo ACL + lockfile sha256）
+- 数字签名 / GPG（信任边界是 npm publish ownership + GitHub mirror tag + lockfile sha256）
 - Windows
 - Web UI
-- 公共 / 私有 npm registry 适配（只走 Codeup git URL）
+- 私有 npm registry（强制走 registry.npmjs.org 公共 registry — 同事如有镜像可自行 `npm config set registry`，但 release 写死 public 发布）
 
 ---
 
@@ -292,4 +289,4 @@ changeset 描述里点明，release 后在团队飞书群发：
 |---|---|
 | 用法问题 / Bug | 飞书 @epingpong 或团队群 at |
 | 漏洞 | [SECURITY.md](SECURITY.md) — **不要发 public issue** |
-| 加新 skill / 改进 | 提 PR 到 [Codeup repo](https://bgs2026-ap-southeast-1.devops.alibabacloudcs.com/codeup/kos/dev-tools/foodmax-ai-config-init) |
+| 加新 skill / 改进 | 提 PR 到 [GitHub repo](https://github.com/jerrydinguk-coder/foodmax-ai-config)（或 Codeup repo，两边都接）|

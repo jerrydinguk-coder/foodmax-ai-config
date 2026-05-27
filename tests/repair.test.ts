@@ -6,16 +6,6 @@ import { runInit } from '../src/commands/init.js';
 import { makeTempProject, makeFakeInstalledPackage } from './helpers/tempProject.js';
 import { generateLockfile } from '../src/lib/lockfile.js';
 import { projectLockfileName } from '../src/lib/paths.js';
-import type { VersionsJson } from '../src/lib/versions.js';
-
-const fakeVersionsJson: VersionsJson = {
-  schemaVersion: 1,
-  channels: { latest: { version: '1.0.0', tag: 'v1.0.0', publishedAt: '2026-01-01T00:00:00Z' } },
-  deprecated: [],
-  minSupportedVersion: '1.0.0',
-  peerRequirements: { claudeCode: '>=1.0.0', node: '>=18.0.0' },
-};
-const fakeFetchVersions = async () => fakeVersionsJson;
 
 let project: ReturnType<typeof makeTempProject>;
 let pkgRoot: string;
@@ -34,7 +24,8 @@ beforeEach(async () => {
     packageRootOverride: pkgRoot,
     exec: async () => ({ stdout: '', stderr: '' }),
     claudeDetect: async () => ({ ok: true as const, version: '1.0.0' }),
-    fetchVersions: fakeFetchVersions,
+    larkCliPresent: async () => true,
+    listMcpNames: async () => [],
     yes: true,
   });
 });
@@ -42,9 +33,7 @@ beforeEach(async () => {
 afterEach(() => project.cleanup());
 
 test('repair restores tampered file by re-installing from source', async () => {
-  // Tamper
   writeFileSync(join(pkgRoot, 'CLAUDE.md'), '# tampered\n');
-  // Fake reinstall: simply restore pristine content
   const reinstall = async () => {
     writeFileSync(join(pkgRoot, 'CLAUDE.md'), pristineContent);
   };
@@ -57,9 +46,8 @@ test('repair restores tampered file by re-installing from source', async () => {
   expect(readFileSync(join(pkgRoot, 'CLAUDE.md'), 'utf8')).toBe(pristineContent);
 });
 
-test('repair pins reinstall to packageVersion from project lockfile', async () => {
-  // beforeEach ran init; .foodmax-ai.lock.json now records packageVersion='0.1.0'
-  // (the fake installed package version, per makeFakeInstalledPackage).
+test('repair pins reinstall to packageVersion from project lockfile (npm spec)', async () => {
+  // beforeEach ran init; .foodmax-ai.lock.json now records packageVersion='0.1.0'.
   writeFileSync(join(pkgRoot, 'CLAUDE.md'), '# tampered\n');
 
   const execCalls: Array<{ cmd: string; args: string[] }> = [];
@@ -79,10 +67,11 @@ test('repair pins reinstall to packageVersion from project lockfile', async () =
   expect(execCalls).toHaveLength(1);
   const call = execCalls[0]!;
   expect(call.cmd).toBe('npm');
-  expect(call.args.at(-1)).toMatch(/#v0\.1\.0$/);
+  // npm spec form: foodmax-ai-config@0.1.0 (NOT a git URL anymore)
+  expect(call.args.at(-1)).toBe('foodmax-ai-config@0.1.0');
 });
 
-test('repair falls back to bare source when project lockfile is missing', async () => {
+test('repair falls back to @latest when project lockfile is missing', async () => {
   rmSync(join(project.dir, projectLockfileName()));
   writeFileSync(join(pkgRoot, 'CLAUDE.md'), '# tampered\n');
 
@@ -100,5 +89,5 @@ test('repair falls back to bare source when project lockfile is missing', async 
   });
 
   expect(r.ok).toBe(true);
-  expect(execCalls[0]!.args.at(-1)).not.toContain('#');
+  expect(execCalls[0]!.args.at(-1)).toBe('foodmax-ai-config@latest');
 });

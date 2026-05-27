@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { valid as semverValid } from 'semver';
 import {
   readLockfile,
   type ProjectLockfile,
@@ -15,18 +16,14 @@ import { installPlugin, defaultExec, type Exec } from '../lib/plugin-install.js'
 import { runAllIntegrations } from '../lib/integrations.js';
 import { ok, fail, info, warn } from '../lib/log.js';
 import {
-  FOODMAX_PACKAGE as PACKAGE_NAME,
-  FOODMAX_SOURCE as SOURCE,
+  FOODMAX_NPM_PACKAGE as PACKAGE_NAME,
   FOODMAX_MARKETPLACE as MARKETPLACE_NAME,
   FOODMAX_PLUGIN as PLUGIN_NAME,
   MANAGED_MCP_NAMES,
+  MIN_CLAUDE_CODE_VERSION,
+  npmInstallSpec,
+  githubMarketplaceSource,
 } from '../lib/constants.js';
-import {
-  fetchVersions as defaultFetchVersions,
-  resolveVersion,
-  type VersionsJson,
-} from '../lib/versions.js';
-import { warnIfDeprecated, requireNotBlocked } from '../lib/deprecation.js';
 import { detectClaudeCli, requireClaudeVersion, type DetectResult } from '../lib/claude-detect.js';
 
 const _exec = promisify(execFile);
@@ -42,12 +39,10 @@ export interface RunUpdateOptions {
   larkCliPresent?: () => Promise<boolean>;
   /** Test injection so update does not run real `claude mcp list`. */
   listMcpNames?: () => Promise<string[]>;
-  /** Pin to a specific semver. Mutually exclusive with channel. */
+  /** Pin to a specific semver. Mutually exclusive with tag. */
   version?: string;
-  /** Pick a channel from versions.json (default: latest). Mutually exclusive with version. */
-  channel?: string;
-  /** Inject for tests: avoid network/git. */
-  fetchVersions?: () => Promise<VersionsJson>;
+  /** Pick an npm dist-tag (default: latest). Mutually exclusive with version. */
+  tag?: string;
   /** Inject for tests: avoid shelling out to `claude --version`. */
   claudeDetect?: () => Promise<DetectResult>;
 }
@@ -56,30 +51,38 @@ export async function runUpdate(opts: RunUpdateOptions): Promise<void> {
   const pkgRoot = opts.packageRootOverride ?? join(opts.cwd, 'node_modules', PACKAGE_NAME);
   const exec = opts.exec ?? defaultExec;
 
-  // Peer check + version resolution
+  // Peer check
   const detect = opts.claudeDetect ?? (() => detectClaudeCli());
   const claudeR = await detect();
-
-  const fetchV = opts.fetchVersions ?? (() => defaultFetchVersions());
-  const versionsJson = await fetchV();
-
-  const claudeReq = requireClaudeVersion(claudeR, versionsJson.peerRequirements.claudeCode);
+  const claudeReq = requireClaudeVersion(claudeR, `>=${MIN_CLAUDE_CODE_VERSION}`);
   if (!claudeReq.ok) throw new Error(claudeReq.reason);
 
-  const resolved = resolveVersion(versionsJson, { version: opts.version, channel: opts.channel });
-  const pinnedSource = `${SOURCE}#${resolved.tag}`;
-
-  warnIfDeprecated(versionsJson, resolved.version);
-  requireNotBlocked(versionsJson, resolved.version);
+  // Version target resolution
+  if (opts.version && opts.tag) {
+    throw new Error('--version and --tag are mutually exclusive');
+  }
+  if (opts.version && !semverValid(opts.version)) {
+    throw new Error(`--version must be a valid semver (got "${opts.version}")`);
+  }
+  const targetSpecifier = opts.version ?? opts.tag ?? 'latest';
+  const npmTarget = npmInstallSpec(targetSpecifier);
 
   const reinstall =
     opts.reinstall ??
     (async () => {
-      await exec('npm', ['install', '--no-save', pinnedSource]);
+      await exec('npm', ['install', '--no-save', npmTarget]);
     });
 
-  console.log(info('Re-fetching latest from source…'));
+  console.log(info('Re-fetching latest from npm…'));
   await reinstall();
+
+  // Now that the package is on disk, read the resolved version so we can pin
+  // the GitHub marketplace ref to match.
+  if (!existsSync(join(pkgRoot, 'package.json'))) {
+    throw new Error(`Installed package not found at ${pkgRoot} after reinstall`);
+  }
+  const installedVersion = readPackageVersion(pkgRoot);
+  const githubSource = githubMarketplaceSource(installedVersion);
 
   // Refresh marketplace (claude plugin marketplace update is the right verb; install is idempotent)
   try {
@@ -87,7 +90,7 @@ export async function runUpdate(opts: RunUpdateOptions): Promise<void> {
   } catch {
     // first-time update may need the install path; do it
     await installPlugin({
-      source: pinnedSource,
+      source: githubSource,
       marketplaceName: MARKETPLACE_NAME,
       pluginName: PLUGIN_NAME,
       scope: 'user',
@@ -141,20 +144,19 @@ export async function runUpdate(opts: RunUpdateOptions): Promise<void> {
   const existing = (existsSync(projectLockPath)
     ? JSON.parse(readFileSync(projectLockPath, 'utf8'))
     : {}) as Partial<ProjectLockfile>;
-  const pkgVersion = readPackageVersion(pkgRoot);
   const next: ProjectLockfile = {
     ...existing,
     version: 1,
     package: PACKAGE_NAME,
-    source: SOURCE,
+    source: PACKAGE_NAME,
     commitSha: await tryReadInstalledCommitSha(pkgRoot),
-    packageVersion: pkgVersion,
+    packageVersion: installedVersion,
     packageRootHash: internalLock.rootHash,
     initializedAt: existing.initializedAt ?? new Date().toISOString(),
-    initializedBy: existing.initializedBy ?? `foodmax-ai@${pkgVersion}`,
+    initializedBy: existing.initializedBy ?? `foodmax-ai@${installedVersion}`,
     updatedAt: new Date().toISOString(),
-    ...(resolved.source === 'channel' ? { channel: resolved.channel } : { channel: undefined }),
-    resolvedFrom: resolved.source,
+    ...(opts.version ? { channel: undefined } : { channel: opts.tag ?? 'latest' }),
+    resolvedFrom: opts.version ? 'explicit-version' : 'channel',
   };
   writeFileSync(projectLockPath, JSON.stringify(next, null, 2) + '\n');
   console.log(ok(`Updated. Project pinned to packageRootHash=${internalLock.rootHash.slice(0, 12)}…`));
@@ -177,17 +179,17 @@ function readPackageVersion(pkgRoot: string): string {
 export function registerUpdate(program: Command): void {
   program
     .command('update')
-    .description('Re-fetch latest, refresh plugin, re-run integrations, rewrite project lockfile')
+    .description('Re-fetch latest from npm, refresh plugin, re-run integrations, rewrite project lockfile')
     .option('--force-mcp', 'Remove and re-register managed MCPs (picks up changed args)')
-    .option('--version <semver>', 'Pin to a specific version (e.g., 1.2.3). Mutually exclusive with --channel')
-    .option('--channel <name>', 'Pick a channel from versions.json (default: latest)')
+    .option('--version <semver>', 'Pin to a specific version (e.g., 1.2.3). Mutually exclusive with --tag')
+    .option('--tag <name>', 'Pick an npm dist-tag (default: latest)')
     .action(async (opts) => {
       try {
         await runUpdate({
           cwd: process.cwd(),
           forceMcp: Boolean(opts.forceMcp),
           version: opts.version,
-          channel: opts.channel,
+          tag: opts.tag,
         });
       } catch (err) {
         console.error(fail(err instanceof Error ? err.message : String(err)));

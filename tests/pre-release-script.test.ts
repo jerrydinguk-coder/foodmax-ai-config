@@ -9,6 +9,7 @@ function makeDeps(overrides: Partial<PreReleaseDeps> = {}): PreReleaseDeps {
     checkLockfileDrift: async () => ({ ok: true }),
     runAudit: async () => ({ ok: true }),
     checkWorkingTreeClean: async () => ({ ok: true }),
+    checkNpmLoggedIn: async () => ({ ok: true }),
     ...overrides,
   };
 }

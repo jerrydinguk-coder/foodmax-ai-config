@@ -1,8 +1,6 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import type { VersionsJson } from '../lib/versions.js';
-import { updateLatestChannel } from '../lib/versions-write.js';
 import { parseLatestVersion } from '../lib/changelog.js';
 
 const execFileAsync = promisify(execFile);
@@ -10,14 +8,10 @@ const execFileAsync = promisify(execFile);
 export interface ReleaseDeps {
   readPackageVersion: () => Promise<string>;
   readChangelog: () => Promise<string>;
-  readVersionsJson: () => Promise<VersionsJson>;
-  writeVersionsJson: (v: VersionsJson) => Promise<void>;
-  now: () => string;
   tagCreate: (tag: string, msg: string) => Promise<void>;
-  tagPush: (tag: string) => Promise<void>;
-  gitAdd: (paths: string[]) => Promise<void>;
-  gitCommit: (msg: string) => Promise<void>;
-  gitPush: (branch: string) => Promise<void>;
+  tagPush: (tag: string, remote: string) => Promise<void>;
+  branchPush: (branch: string, remote: string) => Promise<void>;
+  npmPublish: () => Promise<void>;
 }
 
 export const defaultDeps: ReleaseDeps = {
@@ -26,28 +20,31 @@ export const defaultDeps: ReleaseDeps = {
     return pkg.version as string;
   },
   readChangelog: async () => readFile('CHANGELOG.md', 'utf8'),
-  readVersionsJson: async () =>
-    JSON.parse(await readFile('versions.json', 'utf8')) as VersionsJson,
-  writeVersionsJson: async (v) =>
-    writeFile('versions.json', JSON.stringify(v, null, 2) + '\n'),
-  now: () => new Date().toISOString(),
   tagCreate: async (tag, msg) => {
     await execFileAsync('git', ['tag', '-a', tag, '-m', msg], { timeout: 10_000 });
   },
-  tagPush: async (tag) => {
-    await execFileAsync('git', ['push', 'origin', tag], { timeout: 60_000 });
+  tagPush: async (tag, remote) => {
+    await execFileAsync('git', ['push', remote, tag], { timeout: 60_000 });
   },
-  gitAdd: async (paths) => {
-    await execFileAsync('git', ['add', ...paths], { timeout: 10_000 });
+  branchPush: async (branch, remote) => {
+    await execFileAsync('git', ['push', remote, branch], { timeout: 60_000 });
   },
-  gitCommit: async (msg) => {
-    await execFileAsync('git', ['commit', '-m', msg], { timeout: 10_000 });
-  },
-  gitPush: async (branch) => {
-    await execFileAsync('git', ['push', 'origin', branch], { timeout: 60_000 });
+  npmPublish: async () => {
+    // `npm publish` reads package.json + uses dist/ produced by the prepare
+    // hook (tsup). `publishConfig.access=public` in package.json marks the
+    // package as public on npm.
+    await execFileAsync('npm', ['publish'], { timeout: 180_000 });
   },
 };
 
+/**
+ * Release flow for v1.0.0+:
+ *   1. Verify CHANGELOG.md latest matches package.json version
+ *   2. Create + push git tag to origin (Codeup, the dev source)
+ *   3. Push current branch to github remote (the public mirror)
+ *   4. Push tag to github remote too
+ *   5. npm publish (zero-auth install path for teammates)
+ */
 export async function runRelease(deps: ReleaseDeps = defaultDeps): Promise<void> {
   const version = await deps.readPackageVersion();
   const tag = `v${version}`;
@@ -62,16 +59,17 @@ export async function runRelease(deps: ReleaseDeps = defaultDeps): Promise<void>
   }
 
   await deps.tagCreate(tag, `Release ${tag}`);
-  await deps.tagPush(tag);
-  console.log(`✓ Tagged + pushed ${tag}`);
+  await deps.tagPush(tag, 'origin');
+  console.log(`✓ Tagged + pushed ${tag} to origin (Codeup)`);
 
-  const current = await deps.readVersionsJson();
-  const updated = updateLatestChannel(current, version, deps.now());
-  await deps.writeVersionsJson(updated);
-  await deps.gitAdd(['versions.json']);
-  await deps.gitCommit(`chore(release): bump versions.json to ${tag} [skip ci]`);
-  await deps.gitPush('main');
-  console.log(`✓ Updated versions.json + pushed`);
+  // Mirror to GitHub public repo (consumers' marketplace source). The remote
+  // is named `github` by convention; first-time setup is documented in README.
+  await deps.branchPush('main', 'github');
+  await deps.tagPush(tag, 'github');
+  console.log(`✓ Pushed main + ${tag} to github (public mirror)`);
+
+  await deps.npmPublish();
+  console.log(`✓ npm publish ${tag} — teammates can now \`npx -y foodmax-ai-config@${version} init\``);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -10,8 +10,8 @@ import { packageLockfileName, projectLockfileName } from '../lib/paths.js';
 import { defaultExec, type Exec } from '../lib/plugin-install.js';
 import { ok, warn, fail, info } from '../lib/log.js';
 import {
-  FOODMAX_PACKAGE as PACKAGE_NAME,
-  FOODMAX_SOURCE as SOURCE,
+  FOODMAX_NPM_PACKAGE as PACKAGE_NAME,
+  npmInstallSpec,
 } from '../lib/constants.js';
 
 export interface RunRepairOptions {
@@ -26,23 +26,23 @@ export interface RepairOutcome {
 }
 
 /**
- * Build the npm install target for repair. Honors the pinned version recorded
+ * Build the npm install spec for repair. Honors the pinned version recorded
  * in .foodmax-ai.lock.json so a project pinned to an older release does not
- * silently drift to main.
+ * silently drift to a newer one.
  */
 export function resolveRepairTarget(cwd: string): string {
   const projectLockPath = join(cwd, projectLockfileName());
-  if (!existsSync(projectLockPath)) return SOURCE;
+  if (!existsSync(projectLockPath)) return npmInstallSpec();
   try {
     const parsed = JSON.parse(readFileSync(projectLockPath, 'utf8')) as Partial<ProjectLockfile>;
     const v = parsed.packageVersion;
     if (typeof v === 'string' && v.length > 0) {
-      return `${SOURCE}#v${v}`;
+      return npmInstallSpec(v);
     }
   } catch {
-    // unreadable lockfile → fall back to bare source
+    // unreadable lockfile → fall back to latest tag
   }
-  return SOURCE;
+  return npmInstallSpec();
 }
 
 export async function runRepair(opts: RunRepairOptions): Promise<RepairOutcome> {
@@ -55,7 +55,7 @@ export async function runRepair(opts: RunRepairOptions): Promise<RepairOutcome> 
       await exec('npm', ['install', '--no-save', target]);
     });
 
-  console.log(info(`Re-installing from ${target} to overwrite local edits…`));
+  console.log(info(`Re-installing ${target} to overwrite local edits…`));
   try {
     await reinstall();
   } catch (err) {

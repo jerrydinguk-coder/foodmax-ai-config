@@ -1,97 +1,86 @@
 import { test, expect } from 'vitest';
 import { runRelease, type ReleaseDeps } from '../src/scripts/release.js';
-import type { VersionsJson } from '../src/lib/versions.js';
-
-const baseVersions: VersionsJson = {
-  schemaVersion: 1,
-  channels: {
-    latest: { version: '0.1.0', tag: 'v0.1.0', publishedAt: '2026-01-01T00:00:00Z' },
-  },
-  deprecated: [],
-  minSupportedVersion: '0.1.0',
-  peerRequirements: { claudeCode: '>=1.0.0', node: '>=18.0.0' },
-};
 
 function makeDeps(overrides: Partial<ReleaseDeps> = {}): {
   deps: ReleaseDeps;
   calls: {
     tagCreate: string[];
-    tagPush: string[];
-    gitAdd: string[][];
-    gitCommit: string[];
-    gitPush: string[];
+    tagPushOrigin: string[];
+    tagPushGithub: string[];
+    branchPushGithub: string[];
+    npmPublish: number;
   };
-  writtenVersions: { current?: VersionsJson };
 } {
-  const writtenVersions: { current?: VersionsJson } = {};
   const calls = {
     tagCreate: [] as string[],
-    tagPush: [] as string[],
-    gitAdd: [] as string[][],
-    gitCommit: [] as string[],
-    gitPush: [] as string[],
+    tagPushOrigin: [] as string[],
+    tagPushGithub: [] as string[],
+    branchPushGithub: [] as string[],
+    npmPublish: 0,
   };
   const deps: ReleaseDeps = {
-    readPackageVersion: async () => '0.2.0',
-    readChangelog: async () => `# CHANGELOG\n\n## [0.2.0] - 2026-05-26\n\n### Added\n- thing\n`,
-    readVersionsJson: async () => baseVersions,
-    writeVersionsJson: async (v) => {
-      writtenVersions.current = v;
-    },
-    now: () => '2026-05-26T10:00:00Z',
+    readPackageVersion: async () => '1.0.0',
+    readChangelog: async () => `# CHANGELOG\n\n## 1.0.0\n\n- thing\n`,
     tagCreate: async (tag) => {
       calls.tagCreate.push(tag);
     },
-    tagPush: async (tag) => {
-      calls.tagPush.push(tag);
+    tagPush: async (tag, remote) => {
+      if (remote === 'origin') calls.tagPushOrigin.push(tag);
+      else if (remote === 'github') calls.tagPushGithub.push(tag);
     },
-    gitAdd: async (paths) => {
-      calls.gitAdd.push(paths);
+    branchPush: async (branch, remote) => {
+      if (remote === 'github') calls.branchPushGithub.push(branch);
     },
-    gitCommit: async (msg) => {
-      calls.gitCommit.push(msg);
-    },
-    gitPush: async (branch) => {
-      calls.gitPush.push(branch);
+    npmPublish: async () => {
+      calls.npmPublish += 1;
     },
     ...overrides,
   };
-  return { deps, calls, writtenVersions };
+  return { deps, calls };
 }
 
-test('runRelease creates annotated tag v<version> and pushes it', async () => {
+test('runRelease creates annotated tag v<version> and pushes to origin', async () => {
   const { deps, calls } = makeDeps();
   await runRelease(deps);
-  expect(calls.tagCreate).toEqual(['v0.2.0']);
-  expect(calls.tagPush).toEqual(['v0.2.0']);
+  expect(calls.tagCreate).toEqual(['v1.0.0']);
+  expect(calls.tagPushOrigin).toEqual(['v1.0.0']);
 });
 
-test('runRelease updates versions.json latest channel + commits with [skip ci]', async () => {
-  const { deps, calls, writtenVersions } = makeDeps();
+test('runRelease pushes branch main + tag to github mirror', async () => {
+  const { deps, calls } = makeDeps();
   await runRelease(deps);
-  expect(writtenVersions.current!.channels.latest).toEqual({
-    version: '0.2.0',
-    tag: 'v0.2.0',
-    publishedAt: '2026-05-26T10:00:00Z',
-  });
-  expect(calls.gitAdd[0]).toContain('versions.json');
-  expect(calls.gitCommit[0]).toMatch(/release.*v0\.2\.0.*\[skip ci\]/i);
-  expect(calls.gitPush[0]).toBe('main');
+  expect(calls.branchPushGithub).toEqual(['main']);
+  expect(calls.tagPushGithub).toEqual(['v1.0.0']);
+});
+
+test('runRelease publishes to npm exactly once', async () => {
+  const { deps, calls } = makeDeps();
+  await runRelease(deps);
+  expect(calls.npmPublish).toBe(1);
 });
 
 test('runRelease fails when CHANGELOG.md has no entry for current package version', async () => {
   const { deps } = makeDeps({
-    readPackageVersion: async () => '0.3.0',
-    readChangelog: async () => `# CHANGELOG\n\n## [0.2.0] - 2026-05-26\n`,
+    readPackageVersion: async () => '1.0.1',
+    readChangelog: async () => `# CHANGELOG\n\n## 1.0.0\n`,
   });
-  await expect(runRelease(deps)).rejects.toThrow(/CHANGELOG.*0\.3\.0/);
+  await expect(runRelease(deps)).rejects.toThrow(/CHANGELOG.*1\.0\.1/);
 });
 
-test('runRelease idempotent: if tag already exists locally, fails clearly', async () => {
+test('runRelease bubbles up tag-already-exists error', async () => {
   const { deps } = makeDeps({
     tagCreate: async () => {
-      throw new Error("fatal: tag 'v0.2.0' already exists");
+      throw new Error("fatal: tag 'v1.0.0' already exists");
     },
   });
   await expect(runRelease(deps)).rejects.toThrow(/already exists/);
+});
+
+test('runRelease bubbles up npm publish failure', async () => {
+  const { deps } = makeDeps({
+    npmPublish: async () => {
+      throw new Error('npm ERR! 403 Forbidden');
+    },
+  });
+  await expect(runRelease(deps)).rejects.toThrow(/403/);
 });

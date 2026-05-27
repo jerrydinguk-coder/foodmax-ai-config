@@ -1,9 +1,8 @@
 import { test, expect, beforeEach, afterEach, vi } from 'vitest';
-import { readFileSync, existsSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { readFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { runInit } from '../src/commands/init.js';
 import { makeTempProject, makeFakeInstalledPackage } from './helpers/tempProject.js';
-import type { VersionsJson } from '../src/lib/versions.js';
 
 let project: ReturnType<typeof makeTempProject>;
 let pkgRoot: string;
@@ -31,25 +30,11 @@ const fakeClaudeDetect = async () => ({ ok: true as const, version: '1.0.0' });
 const fakeLarkCliPresent = async () => true;
 const fakeListMcpNames = async () => [] as string[];
 
-const fakeVersionsJson: VersionsJson = {
-  schemaVersion: 1,
-  channels: {
-    latest: { version: '1.2.3', tag: 'v1.2.3', publishedAt: '2026-05-26T00:00:00Z' },
-    beta: { version: '1.3.0-rc.1', tag: 'v1.3.0-rc.1', publishedAt: '2026-05-25T00:00:00Z' },
-  },
-  deprecated: [],
-  minSupportedVersion: '1.0.0',
-  peerRequirements: { claudeCode: '>=1.0.0', node: '>=18.0.0' },
-};
-
-const fakeFetchVersions = async () => fakeVersionsJson;
-
 const baseRunInit = {
   exec: fakeExec,
   claudeDetect: fakeClaudeDetect,
   larkCliPresent: fakeLarkCliPresent,
   listMcpNames: fakeListMcpNames,
-  fetchVersions: fakeFetchVersions,
   yes: true as const,
 };
 
@@ -64,15 +49,16 @@ test('init writes CLAUDE.md with team region', async () => {
   expect(md).toContain('<!-- END foodmax-ai -->');
 });
 
-test('init adds foodmax-ai-config to package.json devDependencies', async () => {
+test('init adds foodmax-ai-config to package.json devDependencies as npm semver', async () => {
   await runInit({
     cwd: project.dir,
     packageRootOverride: pkgRoot,
     ...baseRunInit,
   });
   const pkg = JSON.parse(readFileSync(join(project.dir, 'package.json'), 'utf8'));
-  expect(pkg.devDependencies['foodmax-ai-config']).toContain('foodmax-ai-config-init.git');
-  expect(pkg.devDependencies['foodmax-ai-config']).toContain('#v1.2.3');
+  // Fake package was created at version 0.1.0, so the devDep is the npm
+  // caret range for that version. NOT a git URL anymore.
+  expect(pkg.devDependencies['foodmax-ai-config']).toBe('^0.1.0');
 });
 
 test('init writes .gitignore with settings.local.json', async () => {
@@ -102,10 +88,11 @@ test('init writes .foodmax-ai.lock.json', async () => {
   });
   const lock = JSON.parse(readFileSync(join(project.dir, '.foodmax-ai.lock.json'), 'utf8'));
   expect(lock.package).toBe('foodmax-ai-config');
+  expect(lock.source).toBe('foodmax-ai-config');
   expect(lock.packageRootHash).toMatch(/^[0-9a-f]{64}$/);
 });
 
-test('init invokes plugin install', async () => {
+test('init invokes plugin marketplace add with GitHub URL pinned to installed version', async () => {
   await runInit({
     cwd: project.dir,
     packageRootOverride: pkgRoot,
@@ -116,8 +103,10 @@ test('init invokes plugin install', async () => {
     ([cmd, args]) => cmd === 'claude' && args[0] === 'plugin' && args[1] === 'marketplace' && args[2] === 'add'
   );
   expect(marketplaceCall).toBeDefined();
-  expect(marketplaceCall![1][3]).toContain('foodmax-ai-config-init.git');
-  expect(marketplaceCall![1][3]).toContain('#v1.2.3');
+  // Fake installed pkg is 0.1.0, so marketplace ref is v0.1.0
+  expect(marketplaceCall![1][3]).toBe(
+    'https://github.com/jerrydinguk-coder/foodmax-ai-config.git#v0.1.0'
+  );
 });
 
 test('init invokes superpowers install + MCP registrations after foodmax plugin', async () => {
@@ -126,9 +115,6 @@ test('init invokes superpowers install + MCP registrations after foodmax plugin'
     packageRootOverride: pkgRoot,
     ...baseRunInit,
   });
-  // The foodmax plugin install is first; integrations chain after.
-  // Use loose matchers because order within integrations + MCP-list pre-check exec
-  // calls may vary as we change defaults.
   const hasSuperpowersAdd = execCalls.some(
     ([cmd, args]) =>
       cmd === 'claude' &&
@@ -183,61 +169,81 @@ test('init fails when claude CLI not detected', async () => {
   ).rejects.toThrow(/claude CLI/i);
 });
 
-test('init --version 1.2.3 pins claude plugin marketplace to that tag', async () => {
+test('init --version 1.2.3 uses that as npm install spec (when self-installing)', async () => {
+  rmSync(pkgRoot, { recursive: true, force: true });
+  const exec = async (cmd: string, args: string[]) => {
+    execCalls.push([cmd, args]);
+    if (cmd === 'npm' && args[0] === 'install') {
+      // Re-stage the fake package; it carries version 0.1.0 (helper default).
+      makeFakeInstalledPackage(project.dir);
+    }
+    return { stdout: '', stderr: '' };
+  };
   await runInit({
     cwd: project.dir,
-    packageRootOverride: pkgRoot,
-    ...baseRunInit,
+    exec,
+    claudeDetect: fakeClaudeDetect,
+    larkCliPresent: fakeLarkCliPresent,
+    listMcpNames: fakeListMcpNames,
+    yes: true,
     version: '1.2.3',
   });
-  const marketplaceCall = execCalls.find(
-    ([cmd, args]) => cmd === 'claude' && args[0] === 'plugin' && args[1] === 'marketplace' && args[2] === 'add'
+  const npmCall = execCalls.find(
+    ([cmd, args]) => cmd === 'npm' && args[0] === 'install' && args[1] === '--no-save'
   );
-  expect(marketplaceCall![1][3]).toContain('#v1.2.3');
+  expect(npmCall).toBeDefined();
+  expect(npmCall![1][2]).toBe('foodmax-ai-config@1.2.3');
 });
 
-test('init --channel beta pins to beta tag', async () => {
+test('init --tag beta uses tag in npm install spec', async () => {
+  rmSync(pkgRoot, { recursive: true, force: true });
+  const exec = async (cmd: string, args: string[]) => {
+    execCalls.push([cmd, args]);
+    if (cmd === 'npm' && args[0] === 'install') makeFakeInstalledPackage(project.dir);
+    return { stdout: '', stderr: '' };
+  };
   await runInit({
     cwd: project.dir,
-    packageRootOverride: pkgRoot,
-    ...baseRunInit,
-    channel: 'beta',
+    exec,
+    claudeDetect: fakeClaudeDetect,
+    larkCliPresent: fakeLarkCliPresent,
+    listMcpNames: fakeListMcpNames,
+    yes: true,
+    tag: 'beta',
   });
-  const marketplaceCall = execCalls.find(
-    ([cmd, args]) => cmd === 'claude' && args[0] === 'plugin' && args[1] === 'marketplace' && args[2] === 'add'
+  const npmCall = execCalls.find(
+    ([cmd, args]) => cmd === 'npm' && args[0] === 'install' && args[1] === '--no-save'
   );
-  expect(marketplaceCall![1][3]).toContain('#v1.3.0-rc.1');
+  expect(npmCall![1][2]).toBe('foodmax-ai-config@beta');
 });
 
-test('init default resolves latest channel', async () => {
+test('init default resolves to @latest', async () => {
+  rmSync(pkgRoot, { recursive: true, force: true });
+  const exec = async (cmd: string, args: string[]) => {
+    execCalls.push([cmd, args]);
+    if (cmd === 'npm' && args[0] === 'install') makeFakeInstalledPackage(project.dir);
+    return { stdout: '', stderr: '' };
+  };
   await runInit({
     cwd: project.dir,
-    packageRootOverride: pkgRoot,
-    ...baseRunInit,
+    exec,
+    claudeDetect: fakeClaudeDetect,
+    larkCliPresent: fakeLarkCliPresent,
+    listMcpNames: fakeListMcpNames,
+    yes: true,
   });
-  const marketplaceCall = execCalls.find(
-    ([cmd, args]) => cmd === 'claude' && args[0] === 'plugin' && args[1] === 'marketplace' && args[2] === 'add'
+  const npmCall = execCalls.find(
+    ([cmd, args]) => cmd === 'npm' && args[0] === 'install' && args[1] === '--no-save'
   );
-  expect(marketplaceCall![1][3]).toContain('#v1.2.3');
+  expect(npmCall![1][2]).toBe('foodmax-ai-config@latest');
 });
 
-test('init writes pinned URL to package.json devDependencies', async () => {
+test('init records channel + resolvedFrom in project lockfile when --tag given', async () => {
   await runInit({
     cwd: project.dir,
     packageRootOverride: pkgRoot,
     ...baseRunInit,
-    version: '1.2.3',
-  });
-  const pkg = JSON.parse(readFileSync(join(project.dir, 'package.json'), 'utf8'));
-  expect(pkg.devDependencies['foodmax-ai-config']).toContain('#v1.2.3');
-});
-
-test('init records channel + resolvedFrom in project lockfile', async () => {
-  await runInit({
-    cwd: project.dir,
-    packageRootOverride: pkgRoot,
-    ...baseRunInit,
-    channel: 'beta',
+    tag: 'beta',
   });
   const lock = JSON.parse(readFileSync(join(project.dir, '.foodmax-ai.lock.json'), 'utf8'));
   expect(lock.channel).toBe('beta');
@@ -256,19 +262,30 @@ test('init records resolvedFrom=explicit-version (no channel) when --version giv
   expect(lock.channel).toBeUndefined();
 });
 
-test('init --version + --channel errors', async () => {
+test('init --version + --tag errors', async () => {
   await expect(
     runInit({
       cwd: project.dir,
       packageRootOverride: pkgRoot,
       ...baseRunInit,
       version: '1.2.3',
-      channel: 'beta',
+      tag: 'beta',
     })
   ).rejects.toThrow(/mutually exclusive/i);
 });
 
-test('init blocks when Claude Code version is below peerRequirements', async () => {
+test('init --version rejects invalid semver', async () => {
+  await expect(
+    runInit({
+      cwd: project.dir,
+      packageRootOverride: pkgRoot,
+      ...baseRunInit,
+      version: 'not-a-version',
+    })
+  ).rejects.toThrow(/valid semver/i);
+});
+
+test('init blocks when Claude Code version is below MIN_CLAUDE_CODE_VERSION', async () => {
   await expect(
     runInit({
       cwd: project.dir,
@@ -279,68 +296,14 @@ test('init blocks when Claude Code version is below peerRequirements', async () 
   ).rejects.toThrow(/Claude Code 0\.5\.0.*>=1\.0\.0/);
 });
 
-test('init refuses to install a version marked severity=block', async () => {
-  const fakeBlocked: VersionsJson = {
-    ...fakeVersionsJson,
-    deprecated: [
-      {
-        version: '1.2.3',
-        reason: 'critical: MCP secret leak',
-        fixedIn: '1.2.4',
-        deprecatedAt: '2026-05-20T00:00:00Z',
-        severity: 'block',
-      },
-    ],
-  };
-  await expect(
-    runInit({
-      cwd: project.dir,
-      packageRootOverride: pkgRoot,
-      ...baseRunInit,
-      fetchVersions: async () => fakeBlocked,
-      version: '1.2.3',
-    })
-  ).rejects.toThrow(/blocked/i);
-});
-
-test('init warns but proceeds for warn-severity deprecation', async () => {
-  const fakeWarn: VersionsJson = {
-    ...fakeVersionsJson,
-    deprecated: [
-      {
-        version: '1.2.3',
-        reason: 'cosmetic issue',
-        fixedIn: '1.2.4',
-        deprecatedAt: '2026-05-20T00:00:00Z',
-      },
-    ],
-  };
-  const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-  try {
-    await runInit({
-      cwd: project.dir,
-      packageRootOverride: pkgRoot,
-      ...baseRunInit,
-      fetchVersions: async () => fakeWarn,
-      version: '1.2.3',
-    });
-    const allOutput = spy.mock.calls.map((c) => String(c[0])).join('\n');
-    expect(allOutput).toMatch(/deprecated/i);
-  } finally {
-    spy.mockRestore();
-  }
-});
-
-test('init self-installs when package missing from cwd node_modules', async () => {
-  // Simulate the `npx -y <git-url> init` scenario: the package is NOT pre-staged
-  // in the consumer project's node_modules. init should shell `npm install
-  // --no-save <SOURCE>#<tag>` itself, then proceed.
+test('init self-installs from npm when package missing from cwd node_modules', async () => {
+  // Simulate `npx -y foodmax-ai-config@latest init` against a project that
+  // doesn't have the package pre-staged.
   rmSync(pkgRoot, { recursive: true, force: true });
   expect(existsSync(pkgRoot)).toBe(false);
 
   const exec = async (cmd: string, args: string[]) => {
     execCalls.push([cmd, args]);
-    // Simulate npm install materializing the package on disk.
     if (cmd === 'npm' && args[0] === 'install') {
       makeFakeInstalledPackage(project.dir);
     }
@@ -349,12 +312,10 @@ test('init self-installs when package missing from cwd node_modules', async () =
 
   await runInit({
     cwd: project.dir,
-    // intentionally NO packageRootOverride
     exec,
     claudeDetect: fakeClaudeDetect,
     larkCliPresent: fakeLarkCliPresent,
     listMcpNames: fakeListMcpNames,
-    fetchVersions: fakeFetchVersions,
     yes: true,
   });
 
@@ -362,8 +323,7 @@ test('init self-installs when package missing from cwd node_modules', async () =
     ([cmd, args]) => cmd === 'npm' && args[0] === 'install' && args[1] === '--no-save'
   );
   expect(npmCall).toBeDefined();
-  expect(npmCall![1][2]).toContain('foodmax-ai-config-init.git');
-  expect(npmCall![1][2]).toContain('#v1.2.3');
+  expect(npmCall![1][2]).toBe('foodmax-ai-config@latest');
 
   expect(existsSync(join(project.dir, '.foodmax-ai.lock.json'))).toBe(true);
 });
@@ -371,7 +331,6 @@ test('init self-installs when package missing from cwd node_modules', async () =
 test('init throws if self-install fails to materialize the package', async () => {
   rmSync(pkgRoot, { recursive: true, force: true });
 
-  // Exec that "succeeds" silently but doesn't create the package
   const exec = async (cmd: string, args: string[]) => {
     execCalls.push([cmd, args]);
     return { stdout: '', stderr: '' };
@@ -384,7 +343,6 @@ test('init throws if self-install fails to materialize the package', async () =>
       claudeDetect: fakeClaudeDetect,
       larkCliPresent: fakeLarkCliPresent,
       listMcpNames: fakeListMcpNames,
-      fetchVersions: fakeFetchVersions,
       yes: true,
     })
   ).rejects.toThrow(/Installed package not found/i);
@@ -404,7 +362,6 @@ test('init --dry-run prints would-install line and does not shell out', async ()
       claudeDetect: fakeClaudeDetect,
       larkCliPresent: fakeLarkCliPresent,
       listMcpNames: fakeListMcpNames,
-      fetchVersions: fakeFetchVersions,
       yes: true,
       dryRun: true,
     });
@@ -412,10 +369,9 @@ test('init --dry-run prints would-install line and does not shell out', async ()
     spy.mockRestore();
   }
 
-  // No real shell-out in dry-run
   expect(execCalls.find(([cmd]) => cmd === 'npm')).toBeUndefined();
-  // Output should mention the install it would run
   const joined = logs.join('\n');
   expect(joined).toMatch(/npm install/);
   expect(joined).toMatch(/--no-save/);
+  expect(joined).toMatch(/foodmax-ai-config@latest/);
 });
