@@ -8,7 +8,7 @@
       "name": "foodmax-ai-config",
       "source": ".",
       "description": "FoodMax team-wide AI rules, skills, and hooks",
-      "version": "0.3.0",
+      "version": "1.0.0",
       "hooks": [
         {
           "event": "SessionStart",
