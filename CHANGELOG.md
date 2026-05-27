@@ -1,5 +1,50 @@
 # CHANGELOG
 
+## 0.3.0
+
+### Minor Changes
+
+- 6e370af: feat(mcp): eager-install MCP packages at init/update time
+
+  Previously the MCP registration command (`npx -y @playwright/mcp@latest` /
+  `npx -y @larksuiteoapi/lark-mcp@latest`) downloaded the package the first
+  time Claude Code spawned the MCP — slow on first use, and a hard failure
+  when the user happened to be offline at that moment.
+
+  `registerPlaywrightMcp` and `registerFeishuMcp` now shell `npm install -g
+<pkg>@latest` BEFORE `claude mcp add`, so the package is on disk by the
+  time Claude needs it. The install runs even when the MCP is already
+  registered, so a re-run guarantees the package is materialized regardless
+  of registration state.
+
+  Trade-off: first `init` / `update` takes longer (two `npm install -g`
+  operations); subsequent MCP spawns are instant and work offline (until
+  npm publishes a newer version, at which point `npx -y …@latest` will
+  re-fetch on the next spawn).
+
+- f8dd699: feat(init): self-install the package when missing from cwd `node_modules`
+
+  `init` previously required users to run `npm install --no-save <url>#vX.Y.Z`
+  first, then `npx foodmax-ai init` — the single-command `npx -y <url>.git init`
+  entry point that the old README advertised never actually worked because the
+  npx cache lives outside the project's `node_modules`.
+
+  `init` now detects that case and runs `npm install --no-save <SOURCE>#<tag>`
+  itself before continuing, so the single-command bootstrap from `npx` works
+  end-to-end. `--dry-run` prints the would-install line and exits without
+  touching the filesystem. If the install fails to materialize the package, init
+  throws a clearer error pointing at the likely Codeup auth issue.
+
+### Patch Changes
+
+- 8c3ed11: fix(repair): honor pinned `packageVersion` from `.foodmax-ai.lock.json`
+
+  `repair` previously ran `npm install --no-save <bare-url>`, which silently
+  moved projects pinned to an older release to bootstrapper main. It now reads
+  `packageVersion` from the project lockfile and pins the reinstall to
+  `<url>#v<version>`. Falls back to the bare URL only when the lockfile is
+  absent or malformed.
+
 ## 0.2.1
 
 ### Patch Changes
