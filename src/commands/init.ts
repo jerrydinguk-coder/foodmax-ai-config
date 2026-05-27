@@ -53,11 +53,6 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
       `claude CLI not found. Install Claude Code from https://claude.com/claude-code\nUnderlying error: ${claudeR.error}`
     );
   }
-  if (!existsSync(join(opts.cwd, '.git')) && !opts.yes) {
-    throw new Error(
-      `${opts.cwd} is not a git repository. Re-run with --yes to proceed anyway, or run \`git init\` first.`
-    );
-  }
   const nodeMajor = Number(process.versions.node.split('.')[0] ?? '0');
   if (nodeMajor < 18) {
     throw new Error(`Node 18+ required (you have ${process.versions.node})`);

@@ -14,9 +14,8 @@
 |---|---|---|
 | [Claude Code](https://claude.com/claude-code) | `>=1.0.0` | init 启动时校验，不满足直接报错 |
 | Node | `>=18` | init 启动时校验 |
-| Git | 任意 | 初始化项目用 |
 
-> 同事**不需要任何**账号配置：不需要 npm login，不需要 GitHub 账号，不需要 Codeup 权限。npm 公共 registry 匿名下载、GitHub public repo 匿名拉 marketplace 都是零认证路径。
+> 同事**不需要任何**账号配置：不需要 npm login，不需要 GitHub 账号，不需要 Codeup 权限，也不需要先 `git init`。npm 公共 registry 匿名下载、GitHub public repo 匿名拉 marketplace 都是零认证路径。
 
 ### 安装
 
@@ -103,7 +102,7 @@ claude plugin install foodmax-ai-config@foodmax-ai-config --scope user
 | Flag | 行为 |
 |---|---|
 | `--dry-run` | 只打印"将执行"的动作，不写文件、不 shell out |
-| `--yes` | 跳过 "必须在 git repo 里" 这一条 preflight |
+| `--yes` | 跳过交互式确认（v1.0.3 起 init 没有交互 prompt，本 flag 保留向后兼容，是 no-op）|
 | `--version <semver>` | pin 到具体版本（如 `1.0.0`），与 `--tag` 互斥 |
 | `--tag <name>` | 选 npm dist-tag（默认 `latest`），与 `--version` 互斥 |
 

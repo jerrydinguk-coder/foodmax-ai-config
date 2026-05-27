@@ -10,6 +10,7 @@ function makeDeps(overrides: Partial<VersionPackagesDeps> = {}): {
     gitCommit: string[];
     gitPush: string[];
     writeMarketplace: unknown[];
+    writePluginJson: unknown[];
   };
 } {
   const calls = {

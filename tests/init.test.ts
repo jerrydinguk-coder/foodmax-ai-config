@@ -348,6 +348,27 @@ test('init throws if self-install fails to materialize the package', async () =>
   ).rejects.toThrow(/Installed package not found/i);
 });
 
+test('init does not require cwd to be a git repository', async () => {
+  // Same scenario as the user reported (2026-05-27): teammate ran
+  // `npx -y foodmax-ai-config@latest init` from their home dir (no .git/).
+  // Before v1.0.3 this threw; from v1.0.3 onward we let init proceed and
+  // write into whatever cwd the user picked.
+  rmSync(join(project.dir, '.git'), { recursive: true, force: true });
+  expect(existsSync(join(project.dir, '.git'))).toBe(false);
+
+  await runInit({
+    cwd: project.dir,
+    packageRootOverride: pkgRoot,
+    exec: fakeExec,
+    claudeDetect: fakeClaudeDetect,
+    larkCliPresent: fakeLarkCliPresent,
+    listMcpNames: fakeListMcpNames,
+    // intentionally no `yes` — that's the whole point of this test
+  });
+
+  expect(existsSync(join(project.dir, '.foodmax-ai.lock.json'))).toBe(true);
+});
+
 test('init --dry-run prints would-install line and does not shell out', async () => {
   rmSync(pkgRoot, { recursive: true, force: true });
 
