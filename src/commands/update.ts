@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import { valid as semverValid } from 'semver';
 import {
   readLockfile,
@@ -145,7 +146,7 @@ export async function runUpdate(opts: RunUpdateOptions): Promise<void> {
   }
 
   // Refresh the global team CLAUDE.md so team-rule changes since init reach the user.
-  writeGlobalClaudeMd(opts.homeDirOverride);
+  writeGlobalClaudeMd(opts.homeDirOverride ?? homedir(), pkgRoot);
 
   const projectLockPath = join(opts.cwd, projectLockfileName());
   const existing = (existsSync(projectLockPath)

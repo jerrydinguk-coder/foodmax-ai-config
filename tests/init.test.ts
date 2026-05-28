@@ -62,6 +62,17 @@ test('init writes CLAUDE.md into <home>/.claude/, not the project root', async (
   expect(existsSync(join(project.dir, 'CLAUDE.md'))).toBe(false);
 });
 
+test('init inlines the package CLAUDE.md (real team rules), not a pointer placeholder', async () => {
+  // makeFakeInstalledPackage seeds pkgRoot/CLAUDE.md = '# team rules\n'. The
+  // global file must carry those real rules verbatim — a "继承自团队 plugin, see
+  // the cache" pointer doesn't make Claude follow anything (only ~/.claude/
+  // CLAUDE.md is loaded as global instructions).
+  await runInit({ cwd: project.dir, packageRootOverride: pkgRoot, ...baseRunInit });
+  const md = readFileSync(join(project.dir, '.claude', 'CLAUDE.md'), 'utf8');
+  expect(md).toContain('# team rules');
+  expect(md).not.toContain('继承自团队 plugin');
+});
+
 test('init adds foodmax-ai-config to package.json devDependencies as npm semver', async () => {
   await runInit({
     cwd: project.dir,

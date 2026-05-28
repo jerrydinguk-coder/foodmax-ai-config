@@ -1,6 +1,7 @@
 import type { Command } from 'commander';
 import { join } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import {
   readLockfile,
   verifyLockfile,
@@ -67,7 +68,7 @@ export async function runRepair(opts: RunRepairOptions): Promise<RepairOutcome> 
   }
 
   // Re-apply the global team CLAUDE.md region (repairs a tampered ~/.claude/CLAUDE.md).
-  writeGlobalClaudeMd(opts.homeDirOverride);
+  writeGlobalClaudeMd(opts.homeDirOverride ?? homedir(), pkgRoot);
 
   const lockPath = join(pkgRoot, packageLockfileName());
   if (!existsSync(lockPath)) {

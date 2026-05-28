@@ -123,7 +123,7 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
   const githubSource = githubMarketplaceSource(installedVersion);
 
   // Step 1: project files
-  writeGlobalClaudeMd(opts.homeDirOverride ?? homedir());
+  writeGlobalClaudeMd(opts.homeDirOverride ?? homedir(), pkgRoot);
   writeProjectPackageJson(opts.cwd, installedVersion);
   writeProjectGitignore(opts.cwd);
   writeProjectCiWorkflow(opts.cwd);

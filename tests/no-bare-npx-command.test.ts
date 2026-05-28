@@ -2,7 +2,7 @@ import { test, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { PROJECT_CLAUDE_MD_BLOCK } from '../src/templates/project-claude-md.js';
+import { MANAGED_REGION_NOTICE } from '../src/lib/claude-md.js';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -32,6 +32,6 @@ for (const rel of userFacingFiles) {
   });
 }
 
-test('CLAUDE.md template references foodmax-ai-config, never the bare bin name', () => {
-  expect(PROJECT_CLAUDE_MD_BLOCK).not.toMatch(/foodmax-ai(?!-config)/);
+test('managed-region notice references foodmax-ai-config, never the bare bin name', () => {
+  expect(MANAGED_REGION_NOTICE).not.toMatch(/foodmax-ai(?!-config)/);
 });
