@@ -29,7 +29,7 @@ npx -y foodmax-ai-config@latest init
 
 1. npx 临时拉 bootstrapper 跑起来
 2. init 自动 `npm install --no-save foodmax-ai-config@latest` 把包装到你 `node_modules/`
-3. 写全局 `~/.claude/CLAUDE.md`（团队规则，所有项目生效）+ 项目内文件（package.json / .gitignore / CI workflow / lockfile）
+3. 写全局 `~/.claude/CLAUDE.md`（**覆盖**为团队规则原文，所有项目生效；旧文件先备份到 `~/.claude/CLAUDE-OLD.md`）+ 项目内文件（package.json / .gitignore / CI workflow / lockfile）
 4. `claude plugin marketplace add https://github.com/jerrydinguk-coder/foodmax-ai-config.git#v<X.Y.Z>` 注册到 Claude（GitHub public，匿名访问）
 5. `claude plugin install foodmax-ai-config@foodmax-ai-config --scope user` 装到用户级
 6. 注册 Playwright MCP / Feishu MCP / 装 lark-cli（best-effort）
@@ -50,7 +50,7 @@ npx -y foodmax-ai-config@latest init
 
 | 路径 | 行为 | 重跑 init |
 |---|---|---|
-| `~/.claude/CLAUDE.md` | 在 `<!-- BEGIN/END foodmax-ai -->` 之间插入团队规则 | 覆写标记内，标记外不动（保留你已有的全局规则） |
+| `~/.claude/CLAUDE.md` | **覆盖**为团队 `CLAUDE.md` 原文（包里的规则，逐字一致，无标记） | 覆盖前若旧内容不同，先备份到 `~/.claude/CLAUDE-OLD.md`（重跑不会覆盖最初那份备份；`CLAUDE-OLD.md` 是惰性文件，Claude 不加载） |
 
 **项目内**（当前目录）：
 
