@@ -14,6 +14,7 @@ import {
 } from '../lib/paths.js';
 import { installPlugin, defaultExec, type Exec } from '../lib/plugin-install.js';
 import { runAllIntegrations } from '../lib/integrations.js';
+import { writeGlobalClaudeMd } from '../lib/claude-md.js';
 import { ok, fail, info, warn } from '../lib/log.js';
 import {
   FOODMAX_NPM_PACKAGE as PACKAGE_NAME,
@@ -45,6 +46,8 @@ export interface RunUpdateOptions {
   tag?: string;
   /** Inject for tests: avoid shelling out to `claude --version`. */
   claudeDetect?: () => Promise<DetectResult>;
+  /** Override home dir whose .claude/CLAUDE.md gets refreshed (tests). Defaults to os.homedir(). */
+  homeDirOverride?: string;
 }
 
 export async function runUpdate(opts: RunUpdateOptions): Promise<void> {
@@ -140,6 +143,9 @@ export async function runUpdate(opts: RunUpdateOptions): Promise<void> {
       if (r.hint) console.log(warn(r.hint));
     }
   }
+
+  // Refresh the global team CLAUDE.md so team-rule changes since init reach the user.
+  writeGlobalClaudeMd(opts.homeDirOverride);
 
   const projectLockPath = join(opts.cwd, projectLockfileName());
   const existing = (existsSync(projectLockPath)

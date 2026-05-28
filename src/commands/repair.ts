@@ -8,6 +8,7 @@ import {
 } from '../lib/lockfile.js';
 import { packageLockfileName, projectLockfileName } from '../lib/paths.js';
 import { defaultExec, type Exec } from '../lib/plugin-install.js';
+import { writeGlobalClaudeMd } from '../lib/claude-md.js';
 import { ok, warn, fail, info } from '../lib/log.js';
 import {
   FOODMAX_NPM_PACKAGE as PACKAGE_NAME,
@@ -19,6 +20,8 @@ export interface RunRepairOptions {
   packageRootOverride?: string;
   reinstall?: () => Promise<void>;
   exec?: Exec;
+  /** Override home dir whose .claude/CLAUDE.md gets refreshed (tests). Defaults to os.homedir(). */
+  homeDirOverride?: string;
 }
 
 export interface RepairOutcome {
@@ -62,6 +65,9 @@ export async function runRepair(opts: RunRepairOptions): Promise<RepairOutcome> 
     console.error(fail(`reinstall failed: ${err instanceof Error ? err.message : String(err)}`));
     return { ok: false };
   }
+
+  // Re-apply the global team CLAUDE.md region (repairs a tampered ~/.claude/CLAUDE.md).
+  writeGlobalClaudeMd(opts.homeDirOverride);
 
   const lockPath = join(pkgRoot, packageLockfileName());
   if (!existsSync(lockPath)) {

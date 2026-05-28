@@ -36,6 +36,11 @@ const baseRunInit = {
   larkCliPresent: fakeLarkCliPresent,
   listMcpNames: fakeListMcpNames,
   yes: true as const,
+  // CLAUDE.md now writes to <home>/.claude/; point home at the temp project
+  // dir so tests never touch the real ~/.claude/CLAUDE.md.
+  get homeDirOverride() {
+    return project.dir;
+  },
 };
 
 test('init writes CLAUDE.md with team region', async () => {
@@ -44,9 +49,17 @@ test('init writes CLAUDE.md with team region', async () => {
     packageRootOverride: pkgRoot,
     ...baseRunInit,
   });
-  const md = readFileSync(join(project.dir, 'CLAUDE.md'), 'utf8');
+  // home overridden to project.dir → CLAUDE.md lands in <home>/.claude/
+  const md = readFileSync(join(project.dir, '.claude', 'CLAUDE.md'), 'utf8');
   expect(md).toContain('<!-- BEGIN foodmax-ai -->');
   expect(md).toContain('<!-- END foodmax-ai -->');
+});
+
+test('init writes CLAUDE.md into <home>/.claude/, not the project root', async () => {
+  await runInit({ cwd: project.dir, packageRootOverride: pkgRoot, ...baseRunInit });
+  expect(existsSync(join(project.dir, '.claude', 'CLAUDE.md'))).toBe(true);
+  // old project-level location must NOT be written anymore
+  expect(existsSync(join(project.dir, 'CLAUDE.md'))).toBe(false);
 });
 
 test('init adds foodmax-ai-config to package.json devDependencies as npm semver', async () => {
@@ -153,7 +166,7 @@ test('init invokes superpowers install + MCP registrations after foodmax plugin'
 test('init is idempotent: second run does not duplicate region', async () => {
   await runInit({ cwd: project.dir, packageRootOverride: pkgRoot, ...baseRunInit });
   await runInit({ cwd: project.dir, packageRootOverride: pkgRoot, ...baseRunInit });
-  const md = readFileSync(join(project.dir, 'CLAUDE.md'), 'utf8');
+  const md = readFileSync(join(project.dir, '.claude', 'CLAUDE.md'), 'utf8');
   expect(md.match(/<!-- BEGIN foodmax-ai -->/g)!.length).toBe(1);
 });
 
@@ -186,6 +199,7 @@ test('init --version 1.2.3 uses that as npm install spec (when self-installing)'
     larkCliPresent: fakeLarkCliPresent,
     listMcpNames: fakeListMcpNames,
     yes: true,
+    homeDirOverride: project.dir,
     version: '1.2.3',
   });
   const npmCall = execCalls.find(
@@ -209,6 +223,7 @@ test('init --tag beta uses tag in npm install spec', async () => {
     larkCliPresent: fakeLarkCliPresent,
     listMcpNames: fakeListMcpNames,
     yes: true,
+    homeDirOverride: project.dir,
     tag: 'beta',
   });
   const npmCall = execCalls.find(
@@ -231,6 +246,7 @@ test('init default resolves to @latest', async () => {
     larkCliPresent: fakeLarkCliPresent,
     listMcpNames: fakeListMcpNames,
     yes: true,
+    homeDirOverride: project.dir,
   });
   const npmCall = execCalls.find(
     ([cmd, args]) => cmd === 'npm' && args[0] === 'install' && args[1] === '--no-save'
@@ -317,6 +333,7 @@ test('init self-installs from npm when package missing from cwd node_modules', a
     larkCliPresent: fakeLarkCliPresent,
     listMcpNames: fakeListMcpNames,
     yes: true,
+    homeDirOverride: project.dir,
   });
 
   const npmCall = execCalls.find(
@@ -363,6 +380,7 @@ test('init does not require cwd to be a git repository', async () => {
     claudeDetect: fakeClaudeDetect,
     larkCliPresent: fakeLarkCliPresent,
     listMcpNames: fakeListMcpNames,
+    homeDirOverride: project.dir,
     // intentionally no `yes` — that's the whole point of this test
   });
 
@@ -401,6 +419,7 @@ test('init does NOT claim "Done" when the foodmax plugin install fails', async (
       larkCliPresent: fakeLarkCliPresent,
       listMcpNames: fakeListMcpNames,
       yes: true,
+      homeDirOverride: project.dir,
     });
   } finally {
     spy.mockRestore();

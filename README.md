@@ -29,7 +29,7 @@ npx -y foodmax-ai-config@latest init
 
 1. npx 临时拉 bootstrapper 跑起来
 2. init 自动 `npm install --no-save foodmax-ai-config@latest` 把包装到你 `node_modules/`
-3. 写项目内文件（CLAUDE.md / package.json / .gitignore / CI workflow / lockfile）
+3. 写全局 `~/.claude/CLAUDE.md`（团队规则，所有项目生效）+ 项目内文件（package.json / .gitignore / CI workflow / lockfile）
 4. `claude plugin marketplace add https://github.com/jerrydinguk-coder/foodmax-ai-config.git#v<X.Y.Z>` 注册到 Claude（GitHub public，匿名访问）
 5. `claude plugin install foodmax-ai-config@foodmax-ai-config --scope user` 装到用户级
 6. 注册 Playwright MCP / Feishu MCP / 装 lark-cli（best-effort）
@@ -44,11 +44,18 @@ npx -y foodmax-ai-config@latest init
 
 ## init 做了什么
 
-### A. 在你的项目里改 5 个文件
+### A. 写 1 个全局文件 + 4 个项目文件
+
+**全局**（用户级，装一次所有项目生效，像 Claude Code 本身）：
 
 | 路径 | 行为 | 重跑 init |
 |---|---|---|
-| `CLAUDE.md` | 在 `<!-- BEGIN/END foodmax-ai -->` 之间插入团队规则 | 覆写标记内，标记外不动 |
+| `~/.claude/CLAUDE.md` | 在 `<!-- BEGIN/END foodmax-ai -->` 之间插入团队规则 | 覆写标记内，标记外不动（保留你已有的全局规则） |
+
+**项目内**（当前目录）：
+
+| 路径 | 行为 | 重跑 init |
+|---|---|---|
 | `package.json` | 加 `devDependencies["foodmax-ai-config"] = "^X.Y.Z"`（npm semver caret 范围） | 已有该 key 则不动 |
 | `.gitignore` | 追加 `.claude/settings.local.json` | 已有该行则跳过 |
 | `.github/workflows/ai-config-verify.yml` | 写入 GitHub Actions CI 工作流 | 文件已存在则跳过 |

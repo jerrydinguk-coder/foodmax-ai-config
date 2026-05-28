@@ -1,5 +1,5 @@
 import { test, expect, beforeEach, afterEach } from 'vitest';
-import { writeFileSync, readFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { runUpdate } from '../src/commands/update.js';
 import { runInit } from '../src/commands/init.js';
@@ -28,6 +28,7 @@ beforeEach(async () => {
     larkCliPresent: fakeLarkCliPresent,
     listMcpNames: fakeListMcpNamesEmpty,
     yes: true,
+    homeDirOverride: project.dir,
   });
 });
 
@@ -38,6 +39,11 @@ const baseUpdate = {
   claudeDetect: fakeClaudeDetect,
   larkCliPresent: fakeLarkCliPresent,
   listMcpNames: fakeListMcpNamesEmpty,
+  // update now refreshes <home>/.claude/CLAUDE.md; point home at the temp
+  // project so tests never touch the real ~/.claude/CLAUDE.md.
+  get homeDirOverride() {
+    return project.dir;
+  },
 };
 
 test('update rewrites project lockfile with new packageRootHash', async () => {
@@ -299,4 +305,21 @@ test('update blocks when Claude Code version is below MIN_CLAUDE_CODE_VERSION', 
       claudeDetect: async () => ({ ok: true as const, version: '0.5.0' }),
     })
   ).rejects.toThrow(/Claude Code 0\.5\.0/);
+});
+
+test('update refreshes <home>/.claude/CLAUDE.md so team-rule changes reach old users', async () => {
+  const claudeMdPath = join(project.dir, '.claude', 'CLAUDE.md');
+  // Drop the CLAUDE.md that beforeEach's init wrote — prove update re-writes it.
+  rmSync(claudeMdPath, { force: true });
+  expect(existsSync(claudeMdPath)).toBe(false);
+
+  await runUpdate({
+    cwd: project.dir,
+    packageRootOverride: pkgRoot,
+    ...baseUpdate,
+    exec: async () => ({ stdout: '', stderr: '' }),
+  });
+
+  expect(existsSync(claudeMdPath)).toBe(true);
+  expect(readFileSync(claudeMdPath, 'utf8')).toContain('<!-- BEGIN foodmax-ai -->');
 });

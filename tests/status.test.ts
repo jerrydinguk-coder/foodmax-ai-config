@@ -24,6 +24,7 @@ beforeEach(async () => {
     larkCliPresent: async () => true,
     listMcpNames: async () => [],
     yes: true,
+    homeDirOverride: project.dir,
   });
 });
 

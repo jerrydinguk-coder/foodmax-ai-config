@@ -1,6 +1,7 @@
 import type { Command } from 'commander';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { homedir } from 'node:os';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { valid as semverValid } from 'semver';
@@ -9,8 +10,8 @@ import { packageLockfileName, projectLockfileName } from '../lib/paths.js';
 import { detectClaudeCli, requireClaudeVersion, type DetectResult } from '../lib/claude-detect.js';
 import { installPlugin, defaultExec, type Exec } from '../lib/plugin-install.js';
 import { runAllIntegrations } from '../lib/integrations.js';
-import { mergeClaudeMd, mergeGitignore } from '../lib/merge.js';
-import { PROJECT_CLAUDE_MD_BLOCK } from '../templates/project-claude-md.js';
+import { mergeGitignore } from '../lib/merge.js';
+import { writeGlobalClaudeMd } from '../lib/claude-md.js';
 import { CI_WORKFLOW_YAML } from '../templates/ci-workflow.js';
 import { ok, warn, fail, info, bold } from '../lib/log.js';
 import {
@@ -40,6 +41,8 @@ export interface RunInitOptions {
   version?: string;
   /** Pick an npm dist-tag (default: latest). Mutually exclusive with version. */
   tag?: string;
+  /** Override the home dir whose .claude/CLAUDE.md gets the team region (tests). Defaults to os.homedir(). */
+  homeDirOverride?: string;
 }
 
 export async function runInit(opts: RunInitOptions): Promise<void> {
@@ -82,7 +85,7 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
     if (!pkgInstalled) {
       console.log(info(`  - Run: npm install --no-save ${npmTarget}`));
     }
-    console.log(info(`  - Merge ${join(opts.cwd, 'CLAUDE.md')} with team region`));
+    console.log(info(`  - Merge ${join(opts.homeDirOverride ?? homedir(), '.claude', 'CLAUDE.md')} with team region`));
     console.log(info(`  - Add devDep "${PACKAGE_NAME}" to package.json`));
     console.log(info(`  - Append .gitignore`));
     console.log(info(`  - Write .github/workflows/ai-config-verify.yml`));
@@ -120,7 +123,7 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
   const githubSource = githubMarketplaceSource(installedVersion);
 
   // Step 1: project files
-  writeProjectClaudeMd(opts.cwd);
+  writeGlobalClaudeMd(opts.homeDirOverride ?? homedir());
   writeProjectPackageJson(opts.cwd, installedVersion);
   writeProjectGitignore(opts.cwd);
   writeProjectCiWorkflow(opts.cwd);
@@ -188,7 +191,7 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
     console.log(fail(bold('Init incomplete — the foodmax plugin did NOT install.')));
     console.log(
       warn(
-        'Project files were written, but Claude will NOT load team skills/hooks/CLAUDE.md until the plugin installs.'
+        'Files were written (incl. ~/.claude/CLAUDE.md), but Claude will NOT load team skills/hooks until the plugin installs.'
       )
     );
     console.log(warn(`Reason: ${pluginError}`));
@@ -206,14 +209,6 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
   console.log(info('  3. `lark-cli login` if you plan to use the CLI directly'));
   console.log(info('  4. CI: commit .github/workflows/ai-config-verify.yml so PRs verify on push'));
   console.log(info('  5. Stay current: `npx foodmax-ai update`'));
-}
-
-function writeProjectClaudeMd(cwd: string): void {
-  const path = join(cwd, 'CLAUDE.md');
-  const existing = existsSync(path) ? readFileSync(path, 'utf8') : '';
-  const merged = mergeClaudeMd(existing, PROJECT_CLAUDE_MD_BLOCK);
-  writeFileSync(path, merged);
-  console.log(ok(`Wrote ${path} (team region merged)`));
 }
 
 function writeProjectPackageJson(cwd: string, installedVersion: string): void {

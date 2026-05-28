@@ -1,5 +1,5 @@
 import { test, expect, beforeEach, afterEach } from 'vitest';
-import { writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { runRepair } from '../src/commands/repair.js';
 import { runInit } from '../src/commands/init.js';
@@ -27,6 +27,7 @@ beforeEach(async () => {
     larkCliPresent: async () => true,
     listMcpNames: async () => [],
     yes: true,
+    homeDirOverride: project.dir,
   });
 });
 
@@ -41,6 +42,7 @@ test('repair restores tampered file by re-installing from source', async () => {
     cwd: project.dir,
     packageRootOverride: pkgRoot,
     reinstall,
+    homeDirOverride: project.dir,
   });
   expect(r.ok).toBe(true);
   expect(readFileSync(join(pkgRoot, 'CLAUDE.md'), 'utf8')).toBe(pristineContent);
@@ -61,6 +63,7 @@ test('repair pins reinstall to packageVersion from project lockfile (npm spec)',
     cwd: project.dir,
     packageRootOverride: pkgRoot,
     exec,
+    homeDirOverride: project.dir,
   });
 
   expect(r.ok).toBe(true);
@@ -86,8 +89,29 @@ test('repair falls back to @latest when project lockfile is missing', async () =
     cwd: project.dir,
     packageRootOverride: pkgRoot,
     exec,
+    homeDirOverride: project.dir,
   });
 
   expect(r.ok).toBe(true);
   expect(execCalls[0]!.args.at(-1)).toBe('foodmax-ai-config@latest');
+});
+
+test('repair refreshes <home>/.claude/CLAUDE.md', async () => {
+  const claudeMdPath = join(project.dir, '.claude', 'CLAUDE.md');
+  // Drop the CLAUDE.md that beforeEach's init wrote — prove repair re-writes it.
+  rmSync(claudeMdPath, { force: true });
+  expect(existsSync(claudeMdPath)).toBe(false);
+
+  const reinstall = async () => {
+    writeFileSync(join(pkgRoot, 'CLAUDE.md'), pristineContent);
+  };
+  await runRepair({
+    cwd: project.dir,
+    packageRootOverride: pkgRoot,
+    reinstall,
+    homeDirOverride: project.dir,
+  });
+
+  expect(existsSync(claudeMdPath)).toBe(true);
+  expect(readFileSync(claudeMdPath, 'utf8')).toContain('<!-- BEGIN foodmax-ai -->');
 });
