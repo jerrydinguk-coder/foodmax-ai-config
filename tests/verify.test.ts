@@ -1,4 +1,4 @@
-import { test, expect, beforeEach, afterEach } from 'vitest';
+import { test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runVerify } from '../src/commands/verify.js';
@@ -98,4 +98,27 @@ test('verify: exit 2 when project lockfile missing', async () => {
   });
   expect(r.exitCode).toBe(2);
   fresh.cleanup();
+});
+
+test('verify drift hints use npx -y foodmax-ai-config@latest, not the bare bin name', async () => {
+  // Force version drift so the update/inspect/repair hints print.
+  const projectLockPath = join(project.dir, '.foodmax-ai.lock.json');
+  const lock = JSON.parse(readFileSync(projectLockPath, 'utf8'));
+  lock.packageRootHash = 'deadbeef'.repeat(8);
+  writeFileSync(projectLockPath, JSON.stringify(lock, null, 2));
+
+  const logs: string[] = [];
+  const spy = vi.spyOn(console, 'log').mockImplementation((...args) => {
+    logs.push(args.map(String).join(' '));
+  });
+  try {
+    await runVerify({ cwd: project.dir, packageRootOverride: pkgRoot, strict: false });
+  } finally {
+    spy.mockRestore();
+  }
+  const joined = logs.join('\n');
+  expect(joined).toContain('npx -y foodmax-ai-config@latest update');
+  expect(joined).toContain('npx -y foodmax-ai-config@latest status --diff');
+  expect(joined).toContain('npx -y foodmax-ai-config@latest repair');
+  expect(joined).not.toMatch(/npx foodmax-ai(?!-config)/);
 });

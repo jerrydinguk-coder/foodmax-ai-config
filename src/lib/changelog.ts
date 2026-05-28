@@ -6,7 +6,7 @@ export interface ChangelogEntry {
 
 const MCP_SECTION_KEY_PATTERN = /MCP\s*参数变更/;
 const MCP_FORCE_MCP_NOTE =
-  '\n> ⚠️ 上面这条修改了 MCP 注册参数，请同事用 `npx foodmax-ai update --force-mcp` 升级。';
+  '\n> ⚠️ 上面这条修改了 MCP 注册参数，请同事用 `npx -y foodmax-ai-config@latest update --force-mcp` 升级。';
 
 export function prependChangelogEntry(existing: string, entry: ChangelogEntry): string {
   const lines: string[] = [`## [${entry.version}] - ${entry.date}`, ''];

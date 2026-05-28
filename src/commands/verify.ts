@@ -77,11 +77,11 @@ export async function runVerify(opts: RunVerifyOptions): Promise<VerifyOutcome> 
     console.log(verb(`Project lockfile references a different package version`));
     console.log(info(`  Project pinned to rootHash: ${projectLock.packageRootHash.slice(0, 12)}…`));
     console.log(info(`  Installed rootHash:         ${internalLock.rootHash.slice(0, 12)}…`));
-    console.log(info(`  Run: npx foodmax-ai update`));
+    console.log(info(`  Run: npx -y foodmax-ai-config@latest update`));
   }
   console.log('');
-  console.log(dim(`  Inspect: npx foodmax-ai status --diff`));
-  console.log(dim(`  Repair:  npx foodmax-ai repair`));
+  console.log(dim(`  Inspect: npx -y foodmax-ai-config@latest status --diff`));
+  console.log(dim(`  Repair:  npx -y foodmax-ai-config@latest repair`));
 
   const drifted = [...result.modified, ...result.added, ...result.removed].sort();
   return {

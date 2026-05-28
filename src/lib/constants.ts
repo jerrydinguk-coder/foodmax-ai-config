@@ -64,7 +64,7 @@ export const PLAYWRIGHT_MCP_CMD: readonly string[] = ['npx', '-y', PLAYWRIGHT_MC
 // IMPORTANT: shell command (sh -c wrapper). $LARK_APP_ID / $LARK_APP_SECRET
 // are NOT expanded at init time — they're read from the user's shell env
 // every time Claude Code spawns the MCP. This lets users set creds AFTER
-// running `npx foodmax-ai init`.
+// running `npx -y foodmax-ai-config@latest init`.
 // Same @latest trade-off as Playwright MCP above.
 export const FEISHU_MCP_NAME = 'feishu';
 export const FEISHU_MCP_PKG = '@larksuiteoapi/lark-mcp@latest';

@@ -77,7 +77,7 @@ function eaccesHint(error: string): string | undefined {
     `Point npm at a user-writable prefix, then re-run:`,
     `  npm config set prefix ~/.npm-global`,
     `  echo 'export PATH=$HOME/.npm-global/bin:$PATH' >> ~/.zshrc && source ~/.zshrc`,
-    `  npx foodmax-ai update`,
+    `  npx -y foodmax-ai-config@latest update`,
   ].join('\n');
 }
 
@@ -142,7 +142,7 @@ export async function registerPlaywrightMcp(
         name: 'playwright-mcp',
         status: 'skipped',
         reason: `MCP "${PLAYWRIGHT_MCP_NAME}" already registered`,
-        hint: `An MCP named "${PLAYWRIGHT_MCP_NAME}" is already registered with Claude — its command/args may differ from the team default. To re-register with team defaults: \`npx foodmax-ai update --force-mcp\``,
+        hint: `An MCP named "${PLAYWRIGHT_MCP_NAME}" is already registered with Claude — its command/args may differ from the team default. To re-register with team defaults: \`npx -y foodmax-ai-config@latest update --force-mcp\``,
       };
     }
     await exec('claude', [
@@ -177,7 +177,7 @@ export async function registerFeishuMcp(
         name: 'feishu-mcp',
         status: 'skipped',
         reason: `MCP "${FEISHU_MCP_NAME}" already registered`,
-        hint: `An MCP named "${FEISHU_MCP_NAME}" is already registered with Claude — its command/args may differ from the team default (which uses env-var placeholders for credentials, not hardcoded values). To re-register with team defaults: \`npx foodmax-ai update --force-mcp\``,
+        hint: `An MCP named "${FEISHU_MCP_NAME}" is already registered with Claude — its command/args may differ from the team default (which uses env-var placeholders for credentials, not hardcoded values). To re-register with team defaults: \`npx -y foodmax-ai-config@latest update --force-mcp\``,
       };
     }
     // The shell wrapper preserves the literal $LARK_APP_ID / $LARK_APP_SECRET

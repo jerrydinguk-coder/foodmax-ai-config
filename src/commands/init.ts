@@ -208,7 +208,7 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
   console.log(info('     (without these, the feishu MCP will start but every call will fail)'));
   console.log(info('  3. `lark-cli login` if you plan to use the CLI directly'));
   console.log(info('  4. CI: commit .github/workflows/ai-config-verify.yml so PRs verify on push'));
-  console.log(info('  5. Stay current: `npx foodmax-ai update`'));
+  console.log(info('  5. Stay current: `npx -y foodmax-ai-config@latest update`'));
 }
 
 function writeProjectPackageJson(cwd: string, installedVersion: string): void {

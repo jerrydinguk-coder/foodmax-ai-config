@@ -458,3 +458,21 @@ test('init --dry-run prints would-install line and does not shell out', async ()
   expect(joined).toMatch(/--no-save/);
   expect(joined).toMatch(/foodmax-ai-config@latest/);
 });
+
+test('init "Stay current" hint uses npx -y foodmax-ai-config@latest, not the bare bin name', async () => {
+  // `foodmax-ai` is only a bin name, not a published package. `npx foodmax-ai
+  // update` resolves to a stale local node_modules bin (never upgrades) or 404s.
+  // The hint must give the full, always-fresh spec.
+  const logs: string[] = [];
+  const spy = vi.spyOn(console, 'log').mockImplementation((...args) => {
+    logs.push(args.map(String).join(' '));
+  });
+  try {
+    await runInit({ cwd: project.dir, packageRootOverride: pkgRoot, ...baseRunInit });
+  } finally {
+    spy.mockRestore();
+  }
+  const joined = logs.join('\n');
+  expect(joined).toContain('npx -y foodmax-ai-config@latest update');
+  expect(joined).not.toMatch(/npx foodmax-ai(?!-config)/);
+});
