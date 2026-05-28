@@ -120,6 +120,40 @@ test('registerPlaywrightMcp: failed on exec throw', async () => {
   expect(r.status).toBe('failed');
 });
 
+test('registerPlaywrightMcp: EACCES failure surfaces stderr + no-sudo hint', async () => {
+  // Reproduces the teammate report: `npm install -g` denied because homebrew's
+  // global node_modules is root-owned. We must (a) show the EACCES stderr and
+  // (b) steer them to an npm prefix instead of sudo.
+  const exec: Exec = async () => {
+    const err = new Error('Command failed: npm install -g @playwright/mcp@latest') as Error & {
+      stderr: string;
+    };
+    err.stderr =
+      'npm error code EACCES\nnpm error syscall mkdir\nnpm error path /opt/homebrew/lib/node_modules/@playwright\nnpm error errno -13';
+    throw err;
+  };
+  const r = await registerPlaywrightMcp({ exec, listMcpNames: async () => [] });
+  expect(r.status).toBe('failed');
+  expect(r.reason).toContain('EACCES');
+  expect(r.hint).toBeTruthy();
+  expect(r.hint).toMatch(/sudo/i); // explicitly warns about sudo
+  expect(r.hint).toMatch(/npm config set prefix/); // gives the real fix
+});
+
+test('ensureLarkCli: EACCES failure surfaces stderr + no-sudo hint', async () => {
+  const exec: Exec = async () => {
+    const err = new Error('Command failed: npm install -g @larksuite/cli') as Error & {
+      stderr: string;
+    };
+    err.stderr = 'npm error code EACCES\nnpm error path /opt/homebrew/lib/node_modules/@larksuite';
+    throw err;
+  };
+  const r = await ensureLarkCli({ exec, larkCliPresent: async () => false });
+  expect(r.status).toBe('failed');
+  expect(r.reason).toContain('EACCES');
+  expect(r.hint).toMatch(/sudo/i);
+});
+
 test('registerFeishuMcp: registers when absent (eager-installs lark-mcp first, then claude mcp add with sh -c wrapper)', async () => {
   const calls: Array<[string, string[]]> = [];
   const exec: Exec = async (cmd, args) => {

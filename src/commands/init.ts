@@ -134,9 +134,11 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
     scope: 'user',
     exec,
   });
+  const pluginOk = installR.ok;
+  const pluginError = installR.ok ? '' : installR.error;
   if (!installR.ok) {
-    console.log(warn(`Plugin install reported a non-fatal error: ${installR.error}`));
-    console.log(warn(`You may need to run manually: claude plugin marketplace add ${githubSource}`));
+    console.log(fail(`Plugin install FAILED: ${installR.error}`));
+    console.log(warn(`Manual retry: claude plugin marketplace add ${githubSource}`));
   } else {
     console.log(ok('Claude plugin installed (scope=user)'));
   }
@@ -157,6 +159,7 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
       if (r.hint) console.log(warn(r.hint));
     } else {
       console.log(warn(`${r.name} install failed${r.reason ? `: ${r.reason}` : ''}`));
+      if (r.hint) console.log(warn(r.hint));
     }
   }
 
@@ -179,8 +182,19 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
     JSON.stringify(projectLock, null, 2) + '\n'
   );
 
-  // Step 4: next steps
+  // Step 4: final status — be honest about whether the core plugin installed.
   console.log('');
+  if (!pluginOk) {
+    console.log(fail(bold('Init incomplete — the foodmax plugin did NOT install.')));
+    console.log(
+      warn(
+        'Project files were written, but Claude will NOT load team skills/hooks/CLAUDE.md until the plugin installs.'
+      )
+    );
+    console.log(warn(`Reason: ${pluginError}`));
+    console.log(info('Fix the cause above, then re-run: npx -y foodmax-ai-config@latest init'));
+    return;
+  }
   console.log(ok(bold('Done. Team AI config installed.')));
   console.log('');
   console.log(info(bold('Next:')));

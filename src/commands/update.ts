@@ -137,6 +137,7 @@ export async function runUpdate(opts: RunUpdateOptions): Promise<void> {
       if (r.hint) console.log(warn(r.hint));
     } else {
       console.log(warn(`${r.name} install failed${r.reason ? `: ${r.reason}` : ''}`));
+      if (r.hint) console.log(warn(r.hint));
     }
   }
 

@@ -35,3 +35,27 @@ test('installPlugin returns error if exec throws', async () => {
   });
   expect(r.ok).toBe(false);
 });
+
+test('installPlugin surfaces stderr, not just "Command failed"', async () => {
+  // Reproduces the teammate report: the real git error was hidden because we
+  // only kept err.message ("Command failed: claude plugin marketplace add …").
+  const fakeExec: Exec = async () => {
+    const err = new Error('Command failed: claude plugin marketplace add x') as Error & {
+      stderr: string;
+    };
+    err.stderr = 'remote: Repository not found.\nfatal: repository not found';
+    throw err;
+  };
+  const r = await installPlugin({
+    source: 'https://github.com/owner/repo.git#v1.0.0',
+    marketplaceName: 'm',
+    pluginName: 'p',
+    scope: 'user',
+    exec: fakeExec,
+  });
+  expect(r.ok).toBe(false);
+  if (!r.ok) {
+    expect(r.error).toContain('Repository not found');
+    expect(r.error).toContain('fatal: repository not found');
+  }
+});

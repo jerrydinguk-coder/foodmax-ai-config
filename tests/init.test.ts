@@ -369,6 +369,49 @@ test('init does not require cwd to be a git repository', async () => {
   expect(existsSync(join(project.dir, '.foodmax-ai.lock.json'))).toBe(true);
 });
 
+test('init does NOT claim "Done" when the foodmax plugin install fails', async () => {
+  // Teammate report: marketplace add failed but init still printed
+  // "✓ Done. Team AI config installed." — completely misleading.
+  const logs: string[] = [];
+  const spy = vi.spyOn(console, 'log').mockImplementation((...args) => {
+    logs.push(args.map(String).join(' '));
+  });
+  // Fail ONLY the foodmax plugin marketplace add (matched via its github
+  // source); superpowers + MCPs all succeed.
+  const exec = async (cmd: string, args: string[]) => {
+    if (
+      cmd === 'claude' &&
+      args[0] === 'plugin' &&
+      args[1] === 'marketplace' &&
+      args[2] === 'add' &&
+      String(args[3]).includes('jerrydinguk-coder')
+    ) {
+      const err = new Error('Command failed') as Error & { stderr: string };
+      err.stderr = 'fatal: repository not found';
+      throw err;
+    }
+    return { stdout: '', stderr: '' };
+  };
+  try {
+    await runInit({
+      cwd: project.dir,
+      packageRootOverride: pkgRoot,
+      exec,
+      claudeDetect: fakeClaudeDetect,
+      larkCliPresent: fakeLarkCliPresent,
+      listMcpNames: fakeListMcpNames,
+      yes: true,
+    });
+  } finally {
+    spy.mockRestore();
+  }
+  const joined = logs.join('\n');
+  expect(joined).not.toContain('Done. Team AI config installed.');
+  expect(joined).toMatch(/incomplete|did NOT install|not installed/i);
+  // and the real git error should be visible somewhere
+  expect(joined).toContain('repository not found');
+});
+
 test('init --dry-run prints would-install line and does not shell out', async () => {
   rmSync(pkgRoot, { recursive: true, force: true });
 

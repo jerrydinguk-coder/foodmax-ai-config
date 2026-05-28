@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { defaultExec, type Exec } from './plugin-install.js';
+import { defaultExec, formatExecError, type Exec } from './plugin-install.js';
 import {
   SUPERPOWERS_SOURCE,
   SUPERPOWERS_MARKETPLACE,
@@ -62,6 +62,25 @@ export function parseMcpListNames(stdout: string): string[] {
     });
 }
 
+/**
+ * When `npm install -g` is denied (EACCES — typical on homebrew installs where
+ * /opt/homebrew/lib/node_modules is root-owned), users reach for `sudo`. That's
+ * harmful: sudo can install into root's HOME so Claude never sees the result,
+ * or leaves root-owned files that break later non-sudo update/repair. Steer
+ * them to a user-writable npm prefix instead.
+ */
+function eaccesHint(error: string): string | undefined {
+  if (!/EACCES|permission denied/i.test(error)) return undefined;
+  return [
+    `Global npm install was denied (EACCES) — your global node_modules is not writable by your user.`,
+    `DON'T use sudo: it can install into root's HOME (Claude won't find it) or leave root-owned files that break later updates.`,
+    `Point npm at a user-writable prefix, then re-run:`,
+    `  npm config set prefix ~/.npm-global`,
+    `  echo 'export PATH=$HOME/.npm-global/bin:$PATH' >> ~/.zshrc && source ~/.zshrc`,
+    `  npx foodmax-ai update`,
+  ].join('\n');
+}
+
 async function defaultLarkCliPresent(): Promise<boolean> {
   try {
     await _exec('which', [LARK_CLI_BIN], { timeout: 5_000 });
@@ -100,11 +119,8 @@ export async function installSuperpowers(
     ]);
     return { name: 'superpowers', status: 'installed' };
   } catch (err) {
-    return {
-      name: 'superpowers',
-      status: 'failed',
-      reason: err instanceof Error ? err.message : String(err),
-    };
+    const reason = formatExecError(err);
+    return { name: 'superpowers', status: 'failed', reason, hint: eaccesHint(reason) };
   }
 }
 
@@ -140,11 +156,8 @@ export async function registerPlaywrightMcp(
     ]);
     return { name: 'playwright-mcp', status: 'installed' };
   } catch (err) {
-    return {
-      name: 'playwright-mcp',
-      status: 'failed',
-      reason: err instanceof Error ? err.message : String(err),
-    };
+    const reason = formatExecError(err);
+    return { name: 'playwright-mcp', status: 'failed', reason, hint: eaccesHint(reason) };
   }
 }
 
@@ -182,11 +195,8 @@ export async function registerFeishuMcp(
     ]);
     return { name: 'feishu-mcp', status: 'installed' };
   } catch (err) {
-    return {
-      name: 'feishu-mcp',
-      status: 'failed',
-      reason: err instanceof Error ? err.message : String(err),
-    };
+    const reason = formatExecError(err);
+    return { name: 'feishu-mcp', status: 'failed', reason, hint: eaccesHint(reason) };
   }
 }
 
@@ -206,11 +216,8 @@ export async function ensureLarkCli(
     await exec('npm', ['install', '-g', LARK_CLI_PKG]);
     return { name: 'lark-cli', status: 'installed' };
   } catch (err) {
-    return {
-      name: 'lark-cli',
-      status: 'failed',
-      reason: err instanceof Error ? err.message : String(err),
-    };
+    const reason = formatExecError(err);
+    return { name: 'lark-cli', status: 'failed', reason, hint: eaccesHint(reason) };
   }
 }
 
