@@ -1,10 +1,10 @@
 {
   "version": 1,
-  "tool": "foodmax-ai-config@1.1.2",
-  "generatedAt": "2026-05-28T08:34:01.173Z",
+  "tool": "foodmax-ai-config@1.1.3",
+  "generatedAt": "2026-05-28T11:02:17.737Z",
   "algorithm": "sha256",
   "tree": {
-    ".claude-plugin/marketplace.json": "f9543d24b1f77010a5e9e00979b7916e8d49318cb98b9934393c97672c3368f2",
+    ".claude-plugin/marketplace.json": "8d5d0ace554e9d43d1798cb2c29108866e4b6ee3b29df18e86495a925e18639b",
     "CLAUDE.md": "823356f35875ce62443885c51513484e641ba5de6ee55cf8c029dc543afef726",
     "hooks/hooks.json": "10714de825b808843a29f5981c37e7a80ec7f1b4d8e07d6fb36d31017a7e8739",
     "hooks/session-start-banner.sh": "5f8b7cfbc1b5d6b034f7da5cb37e342106a1e39e7bed46392c5440ae57fd40ff",
@@ -236,5 +236,5 @@
     "skills/xlsx/scripts/office/validators/redlining.py": "f4c33fdb9da0651d1d9aa76f0d5294cc9955869339ae131b2f75f3b2e366cb40",
     "skills/xlsx/scripts/recalc.py": "cf419d15e02965aeaec17773c05b61303f7f520f67fa2696547e7da07502eac7"
   },
-  "rootHash": "a94fb0a9fd52fc3eafa27add115376176a5f3dac3ef772f0be2d1e10f207549d"
+  "rootHash": "7528f5e352f6004c9d1d2578c28b446bb465bd961e5e4c5ab900267268a85c96"
 }
