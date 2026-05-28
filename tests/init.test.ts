@@ -1,5 +1,5 @@
 import { test, expect, beforeEach, afterEach, vi } from 'vitest';
-import { readFileSync, existsSync, rmSync } from 'node:fs';
+import { readFileSync, existsSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runInit } from '../src/commands/init.js';
 import { makeTempProject, makeFakeInstalledPackage } from './helpers/tempProject.js';
@@ -43,18 +43,6 @@ const baseRunInit = {
   },
 };
 
-test('init writes CLAUDE.md with team region', async () => {
-  await runInit({
-    cwd: project.dir,
-    packageRootOverride: pkgRoot,
-    ...baseRunInit,
-  });
-  // home overridden to project.dir → CLAUDE.md lands in <home>/.claude/
-  const md = readFileSync(join(project.dir, '.claude', 'CLAUDE.md'), 'utf8');
-  expect(md).toContain('<!-- BEGIN foodmax-ai -->');
-  expect(md).toContain('<!-- END foodmax-ai -->');
-});
-
 test('init writes CLAUDE.md into <home>/.claude/, not the project root', async () => {
   await runInit({ cwd: project.dir, packageRootOverride: pkgRoot, ...baseRunInit });
   expect(existsSync(join(project.dir, '.claude', 'CLAUDE.md'))).toBe(true);
@@ -71,6 +59,35 @@ test('init inlines the package CLAUDE.md (real team rules), not a pointer placeh
   const md = readFileSync(join(project.dir, '.claude', 'CLAUDE.md'), 'utf8');
   expect(md).toContain('# team rules');
   expect(md).not.toContain('继承自团队 plugin');
+});
+
+test('init overwrites <home>/.claude/CLAUDE.md with the package CLAUDE.md verbatim (no markers)', async () => {
+  await runInit({ cwd: project.dir, packageRootOverride: pkgRoot, ...baseRunInit });
+  const md = readFileSync(join(project.dir, '.claude', 'CLAUDE.md'), 'utf8');
+  const pkgMd = readFileSync(join(pkgRoot, 'CLAUDE.md'), 'utf8');
+  expect(md).toBe(pkgMd);
+  expect(md).not.toContain('<!-- BEGIN foodmax-ai -->');
+});
+
+test('init backs up a pre-existing global CLAUDE.md to CLAUDE-OLD.md before overwriting', async () => {
+  const claudeDir = join(project.dir, '.claude');
+  mkdirSync(claudeDir, { recursive: true });
+  writeFileSync(join(claudeDir, 'CLAUDE.md'), '# 我的旧全局规则\n- 私有偏好 ABC\n');
+  await runInit({ cwd: project.dir, packageRootOverride: pkgRoot, ...baseRunInit });
+  expect(readFileSync(join(claudeDir, 'CLAUDE-OLD.md'), 'utf8')).toContain('私有偏好 ABC');
+  expect(readFileSync(join(claudeDir, 'CLAUDE.md'), 'utf8')).toContain('# team rules');
+});
+
+test('re-running init keeps CLAUDE.md = package rules and never clobbers the original CLAUDE-OLD.md', async () => {
+  const claudeDir = join(project.dir, '.claude');
+  mkdirSync(claudeDir, { recursive: true });
+  writeFileSync(join(claudeDir, 'CLAUDE.md'), '# 原始内容 ORIG\n');
+  await runInit({ cwd: project.dir, packageRootOverride: pkgRoot, ...baseRunInit });
+  await runInit({ cwd: project.dir, packageRootOverride: pkgRoot, ...baseRunInit });
+  expect(readFileSync(join(claudeDir, 'CLAUDE-OLD.md'), 'utf8')).toContain('原始内容 ORIG');
+  expect(readFileSync(join(claudeDir, 'CLAUDE.md'), 'utf8')).toBe(
+    readFileSync(join(pkgRoot, 'CLAUDE.md'), 'utf8')
+  );
 });
 
 test('init adds foodmax-ai-config to package.json devDependencies as npm semver', async () => {
@@ -172,13 +189,6 @@ test('init invokes superpowers install + MCP registrations after foodmax plugin'
   expect(hasSuperpowersInstall).toBe(true);
   expect(hasPlaywrightMcp).toBe(true);
   expect(hasFeishuMcp).toBe(true);
-});
-
-test('init is idempotent: second run does not duplicate region', async () => {
-  await runInit({ cwd: project.dir, packageRootOverride: pkgRoot, ...baseRunInit });
-  await runInit({ cwd: project.dir, packageRootOverride: pkgRoot, ...baseRunInit });
-  const md = readFileSync(join(project.dir, '.claude', 'CLAUDE.md'), 'utf8');
-  expect(md.match(/<!-- BEGIN foodmax-ai -->/g)!.length).toBe(1);
 });
 
 test('init fails when claude CLI not detected', async () => {

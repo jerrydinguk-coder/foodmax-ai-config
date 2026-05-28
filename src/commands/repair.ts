@@ -67,7 +67,7 @@ export async function runRepair(opts: RunRepairOptions): Promise<RepairOutcome> 
     return { ok: false };
   }
 
-  // Re-apply the global team CLAUDE.md region (repairs a tampered ~/.claude/CLAUDE.md).
+  // Overwrite the global team CLAUDE.md (backs up any prior file to CLAUDE-OLD.md).
   writeGlobalClaudeMd(opts.homeDirOverride ?? homedir(), pkgRoot);
 
   const lockPath = join(pkgRoot, packageLockfileName());

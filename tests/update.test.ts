@@ -321,5 +321,7 @@ test('update refreshes <home>/.claude/CLAUDE.md so team-rule changes reach old u
   });
 
   expect(existsSync(claudeMdPath)).toBe(true);
-  expect(readFileSync(claudeMdPath, 'utf8')).toContain('<!-- BEGIN foodmax-ai -->');
+  const refreshed = readFileSync(claudeMdPath, 'utf8');
+  expect(refreshed).toContain('# team rules');
+  expect(refreshed).not.toContain('<!-- BEGIN foodmax-ai -->');
 });

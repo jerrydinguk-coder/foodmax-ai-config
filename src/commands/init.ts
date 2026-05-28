@@ -85,7 +85,7 @@ export async function runInit(opts: RunInitOptions): Promise<void> {
     if (!pkgInstalled) {
       console.log(info(`  - Run: npm install --no-save ${npmTarget}`));
     }
-    console.log(info(`  - Merge ${join(opts.homeDirOverride ?? homedir(), '.claude', 'CLAUDE.md')} with team region`));
+    console.log(info(`  - Overwrite ${join(opts.homeDirOverride ?? homedir(), '.claude', 'CLAUDE.md')} with team CLAUDE.md (prior file → CLAUDE-OLD.md)`));
     console.log(info(`  - Add devDep "${PACKAGE_NAME}" to package.json`));
     console.log(info(`  - Append .gitignore`));
     console.log(info(`  - Write .github/workflows/ai-config-verify.yml`));

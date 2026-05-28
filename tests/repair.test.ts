@@ -113,5 +113,7 @@ test('repair refreshes <home>/.claude/CLAUDE.md', async () => {
   });
 
   expect(existsSync(claudeMdPath)).toBe(true);
-  expect(readFileSync(claudeMdPath, 'utf8')).toContain('<!-- BEGIN foodmax-ai -->');
+  const refreshed = readFileSync(claudeMdPath, 'utf8');
+  expect(refreshed).toContain('# team rules');
+  expect(refreshed).not.toContain('<!-- BEGIN foodmax-ai -->');
 });

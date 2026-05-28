@@ -2,7 +2,6 @@ import { test, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { MANAGED_REGION_NOTICE } from '../src/lib/claude-md.js';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -31,7 +30,3 @@ for (const rel of userFacingFiles) {
     expect(offending).toEqual([]);
   });
 }
-
-test('managed-region notice references foodmax-ai-config, never the bare bin name', () => {
-  expect(MANAGED_REGION_NOTICE).not.toMatch(/foodmax-ai(?!-config)/);
-});
