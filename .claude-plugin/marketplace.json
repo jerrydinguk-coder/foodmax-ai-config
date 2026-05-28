@@ -9,7 +9,7 @@
       "name": "foodmax-ai-config",
       "source": "./",
       "description": "FoodMax team-wide AI rules, skills, and hooks",
-      "version": "1.0.3",
+      "version": "1.0.4",
       "author": {
         "name": "FoodMax Engineering"
       }
